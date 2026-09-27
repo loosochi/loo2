@@ -222,12 +222,13 @@ export class WorldRenderer {
       const onThisRoad = horiz ? Math.abs(d.y - c) < 1 : Math.abs(d.x - c) < 1;
       if (!onThisRoad) continue;
       const len = ROAD.stopLineOffset + 2;
+      const onRoad = (x: number, y: number) => r.containsPoint(x, y);
       if (horiz) {
-        g.fillRect(d.x - d.halfW - len, c - 1.2, len, 2.4);
-        g.fillRect(d.x + d.halfW, c - 1.2, len, 2.4);
+        if (onRoad(d.x - d.halfW - len / 2, c)) g.fillRect(d.x - d.halfW - len, c - 1.2, len, 2.4);
+        if (onRoad(d.x + d.halfW + len / 2, c)) g.fillRect(d.x + d.halfW, c - 1.2, len, 2.4);
       } else {
-        g.fillRect(c - 1.2, d.y - d.halfH - len, 2.4, len);
-        g.fillRect(c - 1.2, d.y + d.halfH, 2.4, len);
+        if (onRoad(c, d.y - d.halfH - len / 2)) g.fillRect(c - 1.2, d.y - d.halfH - len, 2.4, len);
+        if (onRoad(c, d.y + d.halfH + len / 2)) g.fillRect(c - 1.2, d.y + d.halfH, 2.4, len);
       }
     }
   }

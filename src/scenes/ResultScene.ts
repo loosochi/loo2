@@ -67,7 +67,7 @@ export class ResultScene extends Phaser.Scene {
       ['Crashes', String(r.crashes)],
     ];
     const lineH = 26 * s;
-    const headerH = 150 * s;
+    const headerH = 162 * s;
     const statsH = statRows.length * lineH + 12 * s;
     const breakdownH = win ? r.starBreakdown.length * 20 * s + 14 * s : 0;
     const buttonsH = rowButtons ? bh + 20 * s : buttons.length * (bh + 10 * s) + 10 * s;
@@ -83,14 +83,14 @@ export class ResultScene extends Phaser.Scene {
 
     const heading = win ? 'LEVEL COMPLETE' : r.outcome === 'crash' ? 'CRASH!' : "TIME'S UP";
     this.root.add(
-      makeText(this, W / 2, py + 34 * s, heading, { size: 30 * s, bold: true, color: win ? COLORS.good : COLORS.bad }).setOrigin(0.5),
+      makeText(this, W / 2, py + 44 * s, heading, { size: 30 * s, bold: true, color: win ? COLORS.good : COLORS.bad }).setOrigin(0.5),
     );
     this.root.add(
-      makeText(this, W / 2, py + 62 * s, `Level ${level.id} · ${level.name}`, { size: 15 * s, color: COLORS.textDim }).setOrigin(0.5),
+      makeText(this, W / 2, py + 74 * s, `Level ${level.id} · ${level.name}`, { size: 15 * s, color: COLORS.textDim }).setOrigin(0.5),
     );
 
     // Stars.
-    const starY = py + 98 * s;
+    const starY = py + 108 * s;
     const sr = 17 * s;
     for (let i = 0; i < 5; i++) {
       const sx = W / 2 + (i - 2) * sr * 2.5;
@@ -109,7 +109,7 @@ export class ResultScene extends Phaser.Scene {
         }
       }
     }
-    const scoreText = makeText(this, W / 2, py + 134 * s, `SCORE ${r.score}${newBest ? '  ·  NEW BEST!' : ''}`, {
+    const scoreText = makeText(this, W / 2, py + 144 * s, `SCORE ${r.score}${newBest ? '  ·  NEW BEST!' : ''}`, {
       size: 19 * s,
       bold: true,
       color: newBest ? COLORS.star : COLORS.text,

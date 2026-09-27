@@ -79,16 +79,30 @@ export class Button extends Phaser.GameObjects.Container {
     this.scene.tweens.add({ targets: this, scale: 1, duration: 140, ease: 'Back.Out' });
   }
 
+  /** Centre icon + label as one group; shrink the label if it does not fit. */
   private layoutContent(): void {
-    const { width: w, height: h, icon, label } = this.opts;
+    const { width: w, height: h, icon } = this.opts;
     const st = STYLE[this.opts.style ?? 'primary'];
     const iconSize = h * 0.46;
+    const gap = this.label && icon ? h * 0.22 : 0;
+    const iconW = icon ? iconSize : 0;
+    if (this.label) {
+      const maxLabel = w - h * 0.5 - iconW - gap;
+      let size = this.opts.fontSize ?? Math.round(h * 0.38);
+      this.label.setFontSize(size);
+      while (this.label.width > maxLabel && size > 9) {
+        size -= 1;
+        this.label.setFontSize(size);
+      }
+    }
+    const labelW = this.label ? this.label.width : 0;
+    const total = iconW + gap + labelW;
     if (this.iconG) {
       this.iconG.clear();
       drawIcon(this.iconG, icon!, iconSize, st.text);
-      this.iconG.x = label ? -w / 2 + h * 0.55 : 0;
+      this.iconG.x = -total / 2 + iconW / 2;
     }
-    if (this.label && icon) this.label.x = h * 0.2;
+    if (this.label) this.label.x = -total / 2 + iconW + gap + labelW / 2;
   }
 
   private draw(down: boolean): void {

@@ -11,6 +11,7 @@ class AudioManager {
   private master: GainNode | null = null;
   private engine: { gain: GainNode; osc: OscillatorNode; filter: BiquadFilterNode } | null = null;
   private enabled = true;
+  private engineLevel = -1;
 
   setEnabled(on: boolean): void {
     this.enabled = on;
@@ -122,6 +123,8 @@ class AudioManager {
       this.engine = { gain, osc, filter };
     }
     const l = this.enabled ? Math.max(0, Math.min(1, level)) : 0;
+    if (Math.abs(l - this.engineLevel) < 0.04) return; // avoid scheduling automation every frame
+    this.engineLevel = l;
     const t = this.ctx.currentTime;
     this.engine.gain.gain.setTargetAtTime(l * 0.05, t, 0.3);
     this.engine.osc.frequency.setTargetAtTime(50 + l * 25, t, 0.3);

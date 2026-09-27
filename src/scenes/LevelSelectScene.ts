@@ -67,7 +67,6 @@ export class LevelSelectScene extends Phaser.Scene {
     const availH = H - header - pad;
     const cardW = Math.min(190 * s, (W - pad * 2 - gap * (cols - 1)) / cols, (availH - gap * (rows - 1)) / rows / 1.12);
     const cardH = cardW * 1.12;
-    const gridW = cols * cardW + (cols - 1) * gap;
     const gridH = rows * cardH + (rows - 1) * gap;
     const startY = header + Math.max(0, (availH - gridH) / 2);
 
@@ -93,6 +92,5 @@ export class LevelSelectScene extends Phaser.Scene {
       this.tweens.add({ targets: card, alpha: card.input ? 1 : 0.75, y: y, duration: 260, delay: 40 * i, ease: 'Quad.Out' });
       this.root.add(card);
     });
-    void gridW;
   }
 }

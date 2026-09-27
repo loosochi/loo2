@@ -57,6 +57,5 @@ export class Modal extends Phaser.GameObjects.Container {
 
     this.setAlpha(0);
     scene.tweens.add({ targets: this, alpha: 1, duration: 160 });
-    g.setScale(0.96);
   }
 }
