@@ -119,7 +119,8 @@ export class AutoPilot {
             if (!zones.routesConflict(rz.zone, r.id, o.route.id)) continue;
             const orz = o.route.zones.find((z) => z.zone === rz.zone);
             if (!orz) continue;
-            let controlling = -Infinity;
+            // Yielding (free-turn) cars only count once they are committed to the zone.
+            let controlling = o.route.def.free ? orz.sEnter - 2 : -Infinity;
             for (const ost of o.route.stops) if (ost.s < orz.sExit) controlling = ost.s;
             if (o.front >= controlling - 1 && o.rear <= orz.sExit + 2) return false;
           }

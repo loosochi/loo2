@@ -49,4 +49,9 @@ export const level04 = defineLevel({
   goal: { carsToPass: 30, timeLimit: 150 },
   stars: { parTime: 60, avgWait: 5, maxWait: 15, score: 4000 },
   hint: 'Cars turning onto the avenue must cross both junctions. Time limit: 2:30.',
+  ru: {
+    name: 'Двойной перекрёсток',
+    description: 'Два перекрёстка на одном проспекте. Не дайте очереди заблокировать перекрёсток.',
+    hint: 'Поворачивающие на проспект должны проехать оба перекрёстка. Лимит времени: 2:30.',
+  },
 });

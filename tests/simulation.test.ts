@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LEVELS } from '../src/levels/levelRegistry';
+import { level03 } from '../src/levels/level03';
 import { level04 } from '../src/levels/level04';
 import { Path } from '../src/systems/PathSystem';
 import { TrafficSimulation } from '../src/systems/TrafficSimulation';
@@ -51,7 +52,7 @@ describe('restart and determinism', () => {
 
   it('same inputs give the same result (reproducible)', () => {
     const play = () => {
-      const sim = new TrafficSimulation(LEVELS[2]);
+      const sim = new TrafficSimulation(level03);
       for (let i = 0; i < 60 * 40 && sim.status === 'running'; i++) {
         if (i === 300) sim.toggleLight('L_W');
         if (i === 420) sim.toggleLight('L_N');
@@ -103,7 +104,10 @@ describe('paths', () => {
   it('every level binds a stop line to every route and all routes are reachable', () => {
     for (const level of LEVELS) {
       const sim = new TrafficSimulation(level);
-      for (const r of sim.routes) expect(r.stops.length, `${level.name}/${r.id}`).toBeGreaterThan(0);
+      for (const r of sim.routes) {
+        if (r.def.free) expect(r.stops.length, `${level.name}/${r.id}`).toBe(0);
+        else expect(r.stops.length, `${level.name}/${r.id}`).toBeGreaterThan(0);
+      }
       for (const f of level.flows) for (const r of f.routes) expect(sim.routes.some((x) => x.id === r.id)).toBe(true);
       expect(sim.totalCars).toBeGreaterThanOrEqual(level.goal.carsToPass);
     }

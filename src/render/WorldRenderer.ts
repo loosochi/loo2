@@ -4,8 +4,9 @@ import { COLORS } from '../config/theme';
 import { Intersection } from '../entities/Intersection';
 import { Road } from '../entities/Road';
 import type { Vehicle } from '../entities/Vehicle';
+import type { RuntimeRoute } from '../systems/RouteNetwork';
 import type { TrafficSimulation } from '../systems/TrafficSimulation';
-import { LightState, type Dir, type LightDef } from '../types';
+import { LightState, type Dir, type LightDef, type Vec2 } from '../types';
 import { dirVector } from '../utils/geometry';
 import { wrapAngle } from '../utils/math';
 import { CAR_BLINK, CAR_BRAKE, CAR_SHADOW, SOFT_DOT, TEX_SCALE, carKey } from './textures';
@@ -28,6 +29,8 @@ interface CarSprite {
   brake: Phaser.GameObjects.Image;
   blinkF: Phaser.GameObjects.Image;
   blinkR: Phaser.GameObjects.Image;
+  beaconA: Phaser.GameObjects.Image;
+  beaconB: Phaser.GameObjects.Image;
   texture: string;
 }
 
@@ -153,11 +156,15 @@ export class WorldRenderer {
       const q = r.rect(sw);
       road.fillRect(q.x, q.y, q.w, q.h);
     }
+    const slips = this.sim.routes.filter((r) => r.def.free).map((r) => slipPoints(r));
+    for (const pts of slips) strokePath(road, pts, ROAD.laneWidth + sw * 2 + 3, COLORS.curb);
+    for (const pts of slips) strokePath(road, pts, ROAD.laneWidth + sw * 2, COLORS.sidewalk);
     road.fillStyle(COLORS.asphalt, 1);
     for (const r of roads) {
       const q = r.rect(0);
       road.fillRect(q.x, q.y, q.w, q.h);
     }
+    for (const pts of slips) strokePath(road, pts, ROAD.laneWidth - 2, COLORS.asphalt);
 
     // Lane markings (suppressed inside intersections).
     for (const r of roads) this.drawRoadMarkings(m, r, boxes);
@@ -168,6 +175,7 @@ export class WorldRenderer {
       this.drawCrosswalks(m, b);
     }
     for (const l of lvl.lights) this.drawStopLine(m, l.stop, l.dir, l.width);
+    for (const r of this.sim.routes) if (r.def.free) this.drawYield(m, r);
     this.drawEndpoints(m);
 
     // Bake everything static into one texture: one quad per frame instead of thousands of shapes.
@@ -197,12 +205,38 @@ export class WorldRenderer {
     const dash = 16;
     const gap = 12;
     const edge = r.width / 2 - 3;
+    const lanes = r.def.lanes;
     for (let t = a; t < b; t += dash + gap) {
       if (inBox(t, ROAD.stopLineOffset + 4) || inBox(t + dash, ROAD.stopLineOffset + 4)) continue;
-      // Centre line (double yellow near junctions would be overkill for an MVP — dashed amber).
+      if (lanes === 1) {
+        // Dashed amber centre line on two-lane streets.
+        g.fillStyle(COLORS.center, 0.95);
+        if (horiz) g.fillRect(t, c - 1.2, dash, 2.4);
+        else g.fillRect(c - 1.2, t, 2.4, dash);
+      }
+      // White dashed dividers between lanes going the same way.
+      g.fillStyle(COLORS.lane, 0.85);
+      for (let k = 1; k < lanes; k++) {
+        for (const side of [-1, 1]) {
+          const o = c + side * k * ROAD.laneWidth;
+          if (horiz) g.fillRect(t, o - 1, dash, 2);
+          else g.fillRect(o - 1, t, 2, dash);
+        }
+      }
+    }
+    if (lanes > 1) {
+      // Double solid centre line on multi-lane avenues.
       g.fillStyle(COLORS.center, 0.95);
-      if (horiz) g.fillRect(t, c - 1.2, dash, 2.4);
-      else g.fillRect(c - 1.2, t, 2.4, dash);
+      for (let t = a; t < b; t += 8) {
+        if (inBox(t, 0) || inBox(t + 8, 0)) continue;
+        if (horiz) {
+          g.fillRect(t, c - 3.4, 8, 2);
+          g.fillRect(t, c + 1.4, 8, 2);
+        } else {
+          g.fillRect(c - 3.4, t, 2, 8);
+          g.fillRect(c + 1.4, t, 2, 8);
+        }
+      }
     }
     // Solid centre line approaching junctions and edge lines.
     g.fillStyle(COLORS.lane, 0.55);
@@ -231,6 +265,40 @@ export class WorldRenderer {
         if (onRoad(c, d.y + d.halfH + len / 2)) g.fillRect(c - 1.2, d.y + d.halfH, 2.4, len);
       }
     }
+  }
+
+  /** Shark-teeth give-way line and a yield sign where a free right turn merges. */
+  private drawYield(g: Phaser.GameObjects.Graphics, r: RuntimeRoute): void {
+    const z = r.zones[0];
+    if (!z) return;
+    const s = Math.max(0, z.sEnter - 6);
+    const p = r.path.pointAt(s);
+    const h = r.path.headingAt(s);
+    const dx = Math.cos(h);
+    const dy = Math.sin(h);
+    const nx = -dy;
+    const ny = dx;
+    g.fillStyle(0xffffff, 0.95);
+    for (let i = -1.5; i <= 1.5; i += 1) {
+      const cx = p.x + nx * i * 6.5;
+      const cy = p.y + ny * i * 6.5;
+      // Triangles point towards approaching traffic.
+      g.fillTriangle(cx - dx * 5 + nx * 2.8, cy - dy * 5 + ny * 2.8, cx - dx * 5 - nx * 2.8, cy - dy * 5 - ny * 2.8, cx + dx * 1, cy + dy * 1);
+    }
+    // Yield sign on the left edge of the slip lane (the traffic island).
+    const sx = p.x - nx * (ROAD.laneWidth / 2 + 8) - dx * 8;
+    const sy = p.y - ny * (ROAD.laneWidth / 2 + 8) - dy * 8;
+    const pts = [0, 1, 2].map((k) => {
+      const a = h + Math.PI + (k * Math.PI * 2) / 3;
+      return new Phaser.Math.Vector2(sx + Math.cos(a) * 7, sy + Math.sin(a) * 7);
+    });
+    g.fillStyle(0x000000, 0.2);
+    g.fillCircle(sx + 1.5, sy + 2, 7);
+    g.fillStyle(0xe63946, 1);
+    g.fillPoints(pts, true);
+    const inner = pts.map((q) => new Phaser.Math.Vector2(sx + (q.x - sx) * 0.55, sy + (q.y - sy) * 0.55));
+    g.fillStyle(0xffffff, 1);
+    g.fillPoints(inner, true);
   }
 
   private drawCrosswalks(g: Phaser.GameObjects.Graphics, b: Intersection): void {
@@ -397,6 +465,8 @@ export class WorldRenderer {
         brake: this.track(this.scene.add.image(0, 0, CAR_BRAKE).setDepth(DEPTH.carFx)),
         blinkF: this.track(this.scene.add.image(0, 0, CAR_BLINK).setDepth(DEPTH.carFx)),
         blinkR: this.track(this.scene.add.image(0, 0, CAR_BLINK).setDepth(DEPTH.carFx)),
+        beaconA: this.track(this.scene.add.image(0, 0, SOFT_DOT).setDepth(DEPTH.carFx).setBlendMode(Phaser.BlendModes.ADD)),
+        beaconB: this.track(this.scene.add.image(0, 0, SOFT_DOT).setDepth(DEPTH.carFx).setBlendMode(Phaser.BlendModes.ADD)),
         texture: key,
       };
     }
@@ -406,11 +476,13 @@ export class WorldRenderer {
     }
     s.body.clearTint();
     for (const img of [s.shadow, s.body, s.brake, s.blinkF, s.blinkR]) img.setVisible(true);
+    s.beaconA.setVisible(v.emergency);
+    s.beaconB.setVisible(v.emergency);
     return s;
   }
 
   private release(s: CarSprite): void {
-    for (const img of [s.shadow, s.body, s.brake, s.blinkF, s.blinkR]) img.setVisible(false);
+    for (const img of [s.shadow, s.body, s.brake, s.blinkF, s.blinkR, s.beaconA, s.beaconB]) img.setVisible(false);
     this.pool.push(s);
   }
 
@@ -453,6 +525,23 @@ export class WorldRenderer {
     s.blinkF.setVisible(show);
     s.blinkR.setVisible(show);
     if (v.crashed) s.body.setTint(0xff9a9a);
+
+    if (v.emergency) {
+      // Alternating red / blue roof beacons.
+      const phase = Math.floor(this.blinkClock / 160) % 2 === 0;
+      const off = v.length * 0.12;
+      const hw = v.width * 0.28;
+      s.beaconA
+        .setPosition(v.x + cos * off - sin * hw, v.y + sin * off + cos * hw)
+        .setTint(0xff3040)
+        .setScale(phase ? 0.32 : 0.18)
+        .setAlpha(alpha * (phase ? 1 : 0.5));
+      s.beaconB
+        .setPosition(v.x + cos * off + sin * hw, v.y + sin * off - cos * hw)
+        .setTint(0x3a7bff)
+        .setScale(phase ? 0.18 : 0.32)
+        .setAlpha(alpha * (phase ? 0.5 : 1));
+    }
   }
 
   private drawZones(): void {
@@ -500,4 +589,32 @@ export class WorldRenderer {
     this.cars.clear();
     this.pool.length = 0;
   }
+}
+
+/** The curved part of a slip-lane route, with a little straight lead-in and lead-out. */
+function slipPoints(r: RuntimeRoute): Vec2[] {
+  const path = r.path;
+  let first = -1;
+  let last = -1;
+  for (let i = 0; i < path.points.length; i++) {
+    if (path.curvature[i] > 1e-3) {
+      if (first < 0) first = i;
+      last = i;
+    }
+  }
+  if (first < 0) return [];
+  const pad = Math.round(12 / path.step);
+  return path.points.slice(Math.max(0, first - pad), Math.min(path.points.length, last + pad + 1));
+}
+
+function strokePath(g: Phaser.GameObjects.Graphics, pts: Vec2[], width: number, color: number): void {
+  if (pts.length < 2) return;
+  g.lineStyle(width, color, 1);
+  g.beginPath();
+  g.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+  g.strokePath();
+  g.fillStyle(color, 1);
+  g.fillCircle(pts[0].x, pts[0].y, width / 2);
+  g.fillCircle(pts[pts.length - 1].x, pts[pts.length - 1].y, width / 2);
 }

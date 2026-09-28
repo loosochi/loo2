@@ -1,6 +1,7 @@
 /**
  * Helpers for authoring levels on a simple road grid with right-hand traffic.
  * Horizontal roads are identified by their centre y, vertical roads by their centre x.
+ * Roads may have several lanes per direction; lane 0 is the curb (rightmost) lane.
  */
 import { ROAD } from '../config/balanceConfig';
 import type {
@@ -8,6 +9,7 @@ import type {
   Dir,
   ExitPointDef,
   IntersectionDef,
+  LevelDef,
   LightDef,
   LightState,
   RoadDef,
@@ -27,20 +29,26 @@ export const ROAD_HALF = LW;
 export const OFFSCREEN = 60;
 /** Roads extend this far beyond the world so edges never look cut off. */
 export const ROAD_OVERHANG = 1200;
+/** Corner radius of a slip-lane (free) right turn. */
+export const SLIP_RADIUS = 74;
 
 const isHorizontal = (d: Dir): boolean => d === 'E' || d === 'W';
 
-/** Fixed coordinate of the lane travelling in `dir` on the road whose centre is `road`. */
-export function laneCoord(dir: Dir, road: number): number {
+/**
+ * Fixed coordinate of lane `lane` (0 = curb lane) travelling in `dir` on the road whose centre
+ * is `road`, for a road with `lanes` lanes per direction.
+ */
+export function laneCoord(dir: Dir, road: number, lane = 0, lanes = 1): number {
+  const off = (lanes - lane - 0.5) * LW;
   switch (dir) {
     case 'E':
-      return road + LANE_OFFSET;
+      return road + off;
     case 'W':
-      return road - LANE_OFFSET;
+      return road - off;
     case 'S':
-      return road - LANE_OFFSET;
+      return road - off;
     case 'N':
-      return road + LANE_OFFSET;
+      return road + off;
   }
 }
 
@@ -48,26 +56,34 @@ export interface Leg {
   dir: Dir;
   /** Centre coordinate of the road this leg drives on. */
   road: number;
+  /** Lane index, 0 = curb lane (default). */
+  lane?: number;
+  /** Lanes per direction of this road (default 1). */
+  lanes?: number;
 }
 
 /**
  * Build route waypoints from a list of legs. The first leg starts at `start` (coordinate along
  * the leg's axis) and the last leg ends at `end`. Consecutive legs must alternate axis.
+ * `radii[i]` optionally overrides the corner radius of turn i.
  */
-export function legsToPoints(legs: Leg[], start: number, end: number): WaypointDef[] {
+export function legsToPoints(legs: Leg[], start: number, end: number, radii: (number | undefined)[] = []): WaypointDef[] {
+  const lc = (l: Leg) => laneCoord(l.dir, l.road, l.lane ?? 0, l.lanes ?? 1);
   const pts: WaypointDef[] = [];
   const first = legs[0];
-  pts.push(isHorizontal(first.dir) ? { x: start, y: laneCoord(first.dir, first.road) } : { x: laneCoord(first.dir, first.road), y: start });
+  pts.push(isHorizontal(first.dir) ? { x: start, y: lc(first) } : { x: lc(first), y: start });
   for (let i = 1; i < legs.length; i++) {
     const a = legs[i - 1];
     const b = legs[i];
     if (isHorizontal(a.dir) === isHorizontal(b.dir)) throw new Error('Consecutive legs must turn');
     const h = isHorizontal(a.dir) ? a : b;
     const v = isHorizontal(a.dir) ? b : a;
-    pts.push({ x: laneCoord(v.dir, v.road), y: laneCoord(h.dir, h.road) });
+    const p: WaypointDef = { x: lc(v), y: lc(h) };
+    if (radii[i - 1] !== undefined) p.r = radii[i - 1];
+    pts.push(p);
   }
   const last = legs[legs.length - 1];
-  pts.push(isHorizontal(last.dir) ? { x: end, y: laneCoord(last.dir, last.road) } : { x: laneCoord(last.dir, last.road), y: end });
+  pts.push(isHorizontal(last.dir) ? { x: end, y: lc(last) } : { x: lc(last), y: end });
   return pts;
 }
 
@@ -109,72 +125,108 @@ export function route(id: string, spawnId: string, exitId: string, legs: Leg[], 
   return { id, spawnId, exitId, points };
 }
 
-export function hRoad(id: string, y: number, x0 = -ROAD_OVERHANG, x1 = 5000): RoadDef {
-  return { id, from: { x: x0, y }, to: { x: x1, y }, lanes: 1 };
+/**
+ * Free right turn through a slip lane: a wide curve that leaves the curb lane before the stop
+ * line, bypasses the signal and merges into the crossing road, yielding to traffic there.
+ */
+export function freeRight(id: string, spawnId: string, exitId: string, from: Leg, to: Leg, world: World): RouteDef {
+  const points = legsToPoints([from, to], entryCoord(from.dir, world), exitCoord(to.dir, world), [SLIP_RADIUS]);
+  return { id, spawnId, exitId, points, free: true };
 }
 
-export function vRoad(id: string, x: number, y0 = -ROAD_OVERHANG, y1 = 5000): RoadDef {
-  return { id, from: { x, y: y0 }, to: { x, y: y1 }, lanes: 1 };
+export interface RoadOpts {
+  lanes?: number;
+  from?: number;
+  to?: number;
 }
 
-export function crossing(id: string, x: number, y: number, crosswalks: Dir[] = ['N', 'S', 'E', 'W']): IntersectionDef {
-  return { id, x, y, halfW: ROAD_HALF, halfH: ROAD_HALF, crosswalks };
+export function hRoad(id: string, y: number, o: RoadOpts = {}): RoadDef {
+  return { id, from: { x: o.from ?? -ROAD_OVERHANG, y }, to: { x: o.to ?? 5000, y }, lanes: o.lanes ?? 1 };
+}
+
+export function vRoad(id: string, x: number, o: RoadOpts = {}): RoadDef {
+  return { id, from: { x, y: o.from ?? -ROAD_OVERHANG }, to: { x, y: o.to ?? 5000 }, lanes: o.lanes ?? 1 };
+}
+
+/**
+ * Intersection of a horizontal road (`hLanes` per direction) and a vertical road (`vLanes`).
+ */
+export function crossing(
+  id: string,
+  x: number,
+  y: number,
+  crosswalks: Dir[] = ['N', 'S', 'E', 'W'],
+  lanes: { h?: number; v?: number } = {},
+): IntersectionDef {
+  return { id, x, y, halfW: (lanes.v ?? 1) * LW, halfH: (lanes.h ?? 1) * LW, crosswalks };
 }
 
 /**
  * Traffic light for traffic arriving at intersection `ix` while travelling `dir`.
- * The stop line sits before the box; the signal head stands on the right-hand sidewalk.
+ * The stop line spans all inbound lanes; the signal head stands on the right-hand sidewalk
+ * (pushed further out with `headOffset`, e.g. when a slip lane occupies the corner).
  */
-export function light(id: string, ix: IntersectionDef, dir: Dir, initial?: LightState): LightDef {
+export function light(id: string, ix: IntersectionDef, dir: Dir, initial?: LightState, headOffset = 0): LightDef {
   const off = ROAD.stopLineOffset;
-  const side = ROAD_HALF + ROAD.sidewalk * 0.9;
+  const sw = ROAD.sidewalk * 0.9 + headOffset;
   let stop: Vec2;
   let head: Vec2;
+  let width: number;
   switch (dir) {
     case 'E':
-      stop = { x: ix.x - ix.halfW - off, y: ix.y + LANE_OFFSET };
-      head = { x: stop.x - 6, y: ix.y + side };
+      width = ix.halfH;
+      stop = { x: ix.x - ix.halfW - off, y: ix.y + ix.halfH / 2 };
+      head = { x: stop.x - 6, y: ix.y + ix.halfH + sw };
       break;
     case 'W':
-      stop = { x: ix.x + ix.halfW + off, y: ix.y - LANE_OFFSET };
-      head = { x: stop.x + 6, y: ix.y - side };
+      width = ix.halfH;
+      stop = { x: ix.x + ix.halfW + off, y: ix.y - ix.halfH / 2 };
+      head = { x: stop.x + 6, y: ix.y - ix.halfH - sw };
       break;
     case 'S':
-      stop = { x: ix.x - LANE_OFFSET, y: ix.y - ix.halfH - off };
-      head = { x: ix.x - side, y: stop.y - 6 };
+      width = ix.halfW;
+      stop = { x: ix.x - ix.halfW / 2, y: ix.y - ix.halfH - off };
+      head = { x: ix.x - ix.halfW - sw, y: stop.y - 6 };
       break;
     case 'N':
-      stop = { x: ix.x + LANE_OFFSET, y: ix.y + ix.halfH + off };
-      head = { x: ix.x + side, y: stop.y + 6 };
+      width = ix.halfW;
+      stop = { x: ix.x + ix.halfW / 2, y: ix.y + ix.halfH + off };
+      head = { x: ix.x + ix.halfW + sw, y: stop.y + 6 };
       break;
   }
-  return { id, stop, dir, width: LW, head, initial };
+  return { id, stop, dir, width, head, initial };
 }
 
-/** Spawn and exit markers derived from route end points. */
+const dirOf = (a: WaypointDef, b: WaypointDef): Dir =>
+  Math.abs(b.x - a.x) > Math.abs(b.y - a.y) ? (b.x > a.x ? 'E' : 'W') : b.y > a.y ? 'S' : 'N';
+
+/** Spawn and exit markers derived from route end points (one per distinct lane). */
 export function endpoints(routes: RouteDef[]): { spawns: SpawnPointDef[]; exits: ExitPointDef[] } {
   const spawns = new Map<string, SpawnPointDef>();
   const exits = new Map<string, ExitPointDef>();
-  const dirOf = (a: WaypointDef, b: WaypointDef): Dir =>
-    Math.abs(b.x - a.x) > Math.abs(b.y - a.y) ? (b.x > a.x ? 'E' : 'W') : b.y > a.y ? 'S' : 'N';
   for (const r of routes) {
     const p = r.points;
-    if (!spawns.has(r.spawnId)) spawns.set(r.spawnId, { id: r.spawnId, x: p[0].x, y: p[0].y, dir: dirOf(p[0], p[1]) });
     const n = p.length;
-    if (!exits.has(r.exitId)) exits.set(r.exitId, { id: r.exitId, x: p[n - 1].x, y: p[n - 1].y, dir: dirOf(p[n - 2], p[n - 1]) });
+    const sk = `${Math.round(p[0].x)},${Math.round(p[0].y)}`;
+    const ek = `${Math.round(p[n - 1].x)},${Math.round(p[n - 1].y)}`;
+    if (!spawns.has(sk)) spawns.set(sk, { id: r.spawnId, x: p[0].x, y: p[0].y, dir: dirOf(p[0], p[1]) });
+    if (!exits.has(ek)) exits.set(ek, { id: r.exitId, x: p[n - 1].x, y: p[n - 1].y, dir: dirOf(p[n - 2], p[n - 1]) });
   }
   return { spawns: [...spawns.values()], exits: [...exits.values()] };
 }
 
+/** Half width of a road's asphalt. */
+const roadHalf = (r: RoadDef): number => r.lanes * (r.oneWay ? 0.5 : 1) * LW;
+
 /**
  * Scatter trees, bushes and buildings in the free space between roads (deterministic).
  */
-export function autoDecor(world: World, roads: RoadDef[], seed: number, density = 1): DecorDef[] {
+export function autoDecor(world: World, roads: RoadDef[], seed: number, density = 1, avoid: WaypointDef[][] = []): DecorDef[] {
   const rng = new SeededRandom(seed ^ 0x9e3779b9);
   const out: DecorDef[] = [];
-  const clearance = ROAD_HALF + ROAD.sidewalk + 6;
   const nearRoad = (x: number, y: number, pad: number): boolean =>
     roads.some((r) => {
+      const clearance = roadHalf(r) + ROAD.sidewalk + 6;
       const horizontal = r.from.y === r.to.y;
       if (horizontal) {
         const x0 = Math.min(r.from.x, r.to.x);
@@ -184,7 +236,9 @@ export function autoDecor(world: World, roads: RoadDef[], seed: number, density 
       const y0 = Math.min(r.from.y, r.to.y);
       const y1 = Math.max(r.from.y, r.to.y);
       return Math.abs(x - r.from.x) < clearance + pad && y > y0 - clearance - pad && y < y1 + clearance + pad;
-    });
+    }) ||
+    // Keep slip lanes clear (their corner points bulge into the free space).
+    avoid.some((pts) => pts.some((p) => Math.hypot(p.x - x, p.y - y) < SLIP_RADIUS + pad + 10));
   const overlaps = (x: number, y: number, rad: number): boolean =>
     out.some((d) => {
       const dr = d.type === 'building' ? Math.max(d.w ?? 0, d.h ?? 0) / 2 : (d.r ?? 10);
@@ -215,11 +269,12 @@ export function autoDecor(world: World, roads: RoadDef[], seed: number, density 
   return out;
 }
 
-export type LevelInput = Omit<import('../types').LevelDef, 'spawns' | 'exits' | 'decor'> & { decorDensity?: number };
+export type LevelInput = Omit<LevelDef, 'spawns' | 'exits' | 'decor'> & { decorDensity?: number };
 
 /** Complete a level definition with derived spawn/exit markers and decoration. */
-export function defineLevel(input: LevelInput): import('../types').LevelDef {
+export function defineLevel(input: LevelInput): LevelDef {
   const { decorDensity, ...rest } = input;
   const { spawns, exits } = endpoints(rest.routes);
-  return { ...rest, spawns, exits, decor: autoDecor(rest.world, rest.roads, rest.seed, decorDensity ?? 1) };
+  const slips = rest.routes.filter((r) => r.free).map((r) => r.points.slice(1, -1));
+  return { ...rest, spawns, exits, decor: autoDecor(rest.world, rest.roads, rest.seed, decorDensity ?? 1, slips) };
 }

@@ -59,4 +59,9 @@ export const level05 = defineLevel({
   goal: { carsToPass: 38, timeLimit: 180 },
   stars: { parTime: 100, avgWait: 14, maxWait: 35, score: 4200 },
   hint: 'Rush hour! Six entries, eight lights, three minutes.',
+  ru: {
+    name: 'Час пик',
+    description: 'Все хотят домой одновременно. Не дайте городу встать.',
+    hint: 'Час пик! Шесть въездов, восемь светофоров, три минуты.',
+  },
 });

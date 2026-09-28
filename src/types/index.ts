@@ -25,7 +25,14 @@ export enum VehicleState {
   CRASHED = 'CRASHED',
 }
 
-export type VehicleKind = 'compact' | 'sedan' | 'hatch' | 'sport';
+export type CarKind = 'compact' | 'sedan' | 'hatch' | 'sport';
+export type HeavyKind = 'bus' | 'truck';
+export type EmergencyKind = 'ambulance' | 'police' | 'fire';
+export type VehicleKind = CarKind | HeavyKind | EmergencyKind;
+
+export type Lang = 'en' | 'ru';
+/** Text in every supported language. */
+export type LocalizedText = Record<Lang, string>;
 
 /** A straight road segment used for rendering (axis aligned). */
 export interface RoadDef {
@@ -75,6 +82,11 @@ export interface RouteDef {
   spawnId: string;
   exitId: string;
   points: WaypointDef[];
+  /**
+   * Free (slip-lane) right turn: not controlled by any traffic light. Cars yield at the
+   * conflict zones on this route instead of stopping at a signal.
+   */
+  free?: boolean;
 }
 
 export interface SpawnPointDef {
@@ -101,6 +113,32 @@ export interface FlowDef {
   startDelay: number;
   /** Min/max seconds between consecutive cars. */
   interval: [number, number];
+  /** Relative weights per vehicle kind (defaults: cars only). */
+  mix?: Partial<Record<VehicleKind, number>>;
+}
+
+/** A vehicle scheduled at a fixed time (used for emergency vehicles). */
+export interface SpecialDef {
+  at: number;
+  spawnId: string;
+  routeId: string;
+  kind: VehicleKind;
+}
+
+export type TutorialWait =
+  | { type: 'tap' }
+  | { type: 'light'; id: string; state: LightState }
+  | { type: 'passed'; count: number }
+  | { type: 'time'; seconds: number };
+
+export interface TutorialStep {
+  text: LocalizedText;
+  /** Light to point at. */
+  target?: string;
+  /** Condition to continue. */
+  wait: TutorialWait;
+  /** Freeze traffic while this step is shown. */
+  freeze?: boolean;
 }
 
 export interface DecorDef {
@@ -147,6 +185,12 @@ export interface LevelDef {
   stars: StarCriteria;
   decor: DecorDef[];
   hint?: string;
+  /** Russian texts (English is the default in name/description/hint). */
+  ru?: { name: string; description: string; hint?: string };
+  specials?: SpecialDef[];
+  tutorial?: TutorialStep[];
+  /** Custom level made in the editor. */
+  custom?: boolean;
 }
 
 export type GameOutcome = 'win' | 'crash' | 'timeout';
@@ -162,5 +206,14 @@ export interface LevelResult {
   avgWait: number;
   maxWait: number;
   crashes: number;
-  starBreakdown: { label: string; earned: boolean }[];
+  starBreakdown: StarCheck[];
+}
+
+export type StarCheckId = 'complete' | 'par' | 'avgWait' | 'maxWait' | 'score';
+
+export interface StarCheck {
+  id: StarCheckId;
+  /** Threshold shown in the label (seconds or points). */
+  value: number;
+  earned: boolean;
 }

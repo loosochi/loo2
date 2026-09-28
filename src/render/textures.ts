@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { VEHICLE_SPECS } from '../config/balanceConfig';
-import { CAR_COLORS } from '../config/theme';
+import { paletteFor } from '../config/theme';
 import type { VehicleKind } from '../types';
 
 /** Textures are drawn at this multiple of world size so they stay crisp when zoomed in. */
@@ -25,10 +25,10 @@ export function generateTextures(scene: Phaser.Scene): void {
   const S = TEX_SCALE;
 
   for (const spec of VEHICLE_SPECS) {
-    for (const color of CAR_COLORS) {
+    for (const color of paletteFor(spec.kind)) {
       const key = carKey(spec.kind, color);
       if (scene.textures.exists(key)) continue;
-      drawCar(g, spec.kind, spec.length * S, spec.width * S, color);
+      drawVehicle(g, spec.kind, spec.length * S, spec.width * S, color);
       g.generateTexture(key, Math.ceil(spec.length * S) + 2, Math.ceil(spec.width * S) + 2);
       g.clear();
     }
@@ -75,8 +75,90 @@ export function generateTextures(scene: Phaser.Scene): void {
   g.destroy();
 }
 
-/** Top-down car, nose pointing to +x. */
-function drawCar(g: Phaser.GameObjects.Graphics, kind: VehicleKind, L: number, W: number, color: number): void {
+function drawVehicle(g: Phaser.GameObjects.Graphics, kind: VehicleKind, L: number, W: number, color: number): void {
+  switch (kind) {
+    case 'bus':
+      return drawBus(g, L, W, color);
+    case 'truck':
+      return drawTruck(g, L, W, color, 0xeef1f4);
+    case 'fire':
+      return drawFireEngine(g, L, W, color);
+    case 'ambulance':
+    case 'police':
+      return drawCar(g, 'sedan', L, W, color, kind);
+    default:
+      return drawCar(g, kind, L, W, color);
+  }
+}
+
+function lights(g: Phaser.GameObjects.Graphics, L: number, W: number): void {
+  g.fillStyle(0xfff6d0, 1);
+  g.fillRoundedRect(1 + L - 5, 1 + 3, 4, W * 0.2, 1.5);
+  g.fillRoundedRect(1 + L - 5, 1 + W - 3 - W * 0.2, 4, W * 0.2, 1.5);
+  g.fillStyle(0xb3262b, 1);
+  g.fillRect(2, 4, 3, W * 0.18);
+  g.fillRect(2, W - 2 - W * 0.18, 3, W * 0.18);
+}
+
+/** City bus: long body, side window strips, roof units. */
+function drawBus(g: Phaser.GameObjects.Graphics, L: number, W: number, color: number): void {
+  const dark = shade(color, -0.35);
+  g.fillStyle(dark, 1);
+  g.fillRoundedRect(1, 1, L, W, 8);
+  g.fillStyle(color, 1);
+  g.fillRoundedRect(2.5, 2.5, L - 3, W - 3, 7);
+  // Roof panel and window strips along both sides.
+  g.fillStyle(shade(color, 0.3), 1);
+  g.fillRoundedRect(L * 0.06, W * 0.22, L * 0.84, W * 0.56, 5);
+  g.fillStyle(0x1e2a3a, 1);
+  for (let i = 0; i < 7; i++) {
+    const wx = L * 0.08 + i * L * 0.115;
+    g.fillRect(wx, 4, L * 0.09, W * 0.13);
+    g.fillRect(wx, W - 2 - W * 0.13, L * 0.09, W * 0.13);
+  }
+  g.fillRoundedRect(L - L * 0.07, W * 0.12, L * 0.055, W * 0.76, 4); // windscreen
+  // Roof air-conditioning units.
+  g.fillStyle(0xdfe4ea, 1);
+  g.fillRoundedRect(L * 0.3, W * 0.32, L * 0.16, W * 0.36, 3);
+  g.fillRoundedRect(L * 0.58, W * 0.32, L * 0.12, W * 0.36, 3);
+  lights(g, L, W);
+}
+
+/** Truck: coloured cab at the front, light cargo box behind. */
+function drawTruck(g: Phaser.GameObjects.Graphics, L: number, W: number, cab: number, cargo: number): void {
+  const cabL = L * 0.26;
+  g.fillStyle(0x2b2f38, 1);
+  g.fillRoundedRect(L - cabL - 4, W * 0.3, 8, W * 0.4, 2); // hitch
+  g.fillStyle(shade(cargo, -0.25), 1);
+  g.fillRoundedRect(1, 1, L - cabL - 3, W, 4);
+  g.fillStyle(cargo, 1);
+  g.fillRoundedRect(2.5, 2.5, L - cabL - 6, W - 3, 3);
+  g.fillStyle(shade(cargo, -0.1), 1);
+  for (let i = 1; i < 5; i++) g.fillRect(2.5 + (i * (L - cabL - 6)) / 5, 3, 2, W - 4);
+  g.fillStyle(shade(cab, -0.35), 1);
+  g.fillRoundedRect(L - cabL + 1, 1, cabL, W, 6);
+  g.fillStyle(cab, 1);
+  g.fillRoundedRect(L - cabL + 2.5, 2.5, cabL - 3, W - 3, 5);
+  g.fillStyle(0x1e2a3a, 1);
+  g.fillRoundedRect(L - cabL * 0.35, W * 0.14, cabL * 0.22, W * 0.72, 3);
+  g.fillStyle(shade(cab, 0.3), 1);
+  g.fillRoundedRect(L - cabL * 0.85, W * 0.2, cabL * 0.42, W * 0.6, 3);
+  lights(g, L, W);
+}
+
+/** Fire engine: red body with a ladder on the roof. */
+function drawFireEngine(g: Phaser.GameObjects.Graphics, L: number, W: number, color: number): void {
+  drawTruck(g, L, W, color, color);
+  g.fillStyle(0xc9ced6, 1);
+  g.fillRect(L * 0.06, W * 0.3, L * 0.62, 3);
+  g.fillRect(L * 0.06, W * 0.7 - 3, L * 0.62, 3);
+  for (let i = 0; i < 9; i++) g.fillRect(L * 0.07 + i * L * 0.07, W * 0.3, 2.5, W * 0.4);
+  g.fillStyle(0xffffff, 0.9);
+  g.fillRect(2.5, W * 0.46, L * 0.7, W * 0.08);
+}
+
+/** Top-down car, nose pointing to +x. Ambulance and police variants get their livery. */
+function drawCar(g: Phaser.GameObjects.Graphics, kind: VehicleKind, L: number, W: number, color: number, livery?: 'ambulance' | 'police'): void {
   const x = 1;
   const y = 1;
   const dark = shade(color, -0.35);
@@ -90,7 +172,8 @@ function drawCar(g: Phaser.GameObjects.Graphics, kind: VehicleKind, L: number, W
   g.fillRoundedRect(x + 1.5, y + 1.5, L - 3, W - 3, r * 0.85);
 
   // Cabin proportions per body style.
-  const cabin = { compact: [0.3, 0.78], sedan: [0.28, 0.72], hatch: [0.22, 0.8], sport: [0.36, 0.74] }[kind];
+  const cabins: Record<string, number[]> = { compact: [0.3, 0.78], sedan: [0.28, 0.72], hatch: [0.22, 0.8], sport: [0.36, 0.74] };
+  const cabin = cabins[kind] ?? cabins.sedan;
   const c0 = x + L * cabin[0];
   const c1 = x + L * cabin[1];
   const inset = W * 0.14;
@@ -108,6 +191,18 @@ function drawCar(g: Phaser.GameObjects.Graphics, kind: VehicleKind, L: number, W
   if (kind === 'sport') {
     g.fillStyle(0xffffff, 0.85);
     g.fillRect(x + 4, y + W / 2 - 2, L - 8, 4);
+  }
+  if (livery === 'ambulance') {
+    g.fillStyle(0xe63946, 1);
+    g.fillRect(x + 3, y + 1.5, L * 0.3, W * 0.12);
+    g.fillRect(x + 3, y + W - 1.5 - W * 0.12, L * 0.3, W * 0.12);
+    g.fillRect(x + L * 0.08, y + W / 2 - W * 0.07, L * 0.18, W * 0.14);
+    g.fillRect(x + L * 0.17 - W * 0.07, y + W / 2 - L * 0.09, W * 0.14, L * 0.18);
+  }
+  if (livery === 'police') {
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(x + L * 0.3, y + 1.5, L * 0.36, W * 0.16);
+    g.fillRect(x + L * 0.3, y + W - 1.5 - W * 0.16, L * 0.36, W * 0.16);
   }
 
   // Headlights / tail lights.

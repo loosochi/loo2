@@ -1,5 +1,5 @@
 import { SCORE } from '../config/balanceConfig';
-import type { GameOutcome, LevelResult, StarCriteria } from '../types';
+import type { GameOutcome, LevelResult, StarCheck, StarCriteria } from '../types';
 
 export interface ScoreSnapshot {
   score: number;
@@ -26,6 +26,8 @@ export class ScoreSystem {
   private penalties = 0;
   longWaitSeconds = 0;
   queueSeconds = 0;
+  emergencyWaitSeconds = 0;
+  private exitPoints = 0;
 
   reset(): void {
     this.passed = 0;
@@ -35,10 +37,14 @@ export class ScoreSystem {
     this.penalties = 0;
     this.longWaitSeconds = 0;
     this.queueSeconds = 0;
+    this.emergencyWaitSeconds = 0;
+    this.exitPoints = 0;
   }
 
-  onVehicleExit(waitTime: number): void {
+  /** A vehicle reached an exit; `points` depends on its kind (buses and emergencies are worth more). */
+  onVehicleExit(waitTime: number, points: number = SCORE.perCar): void {
     this.passed++;
+    this.exitPoints += points;
     this.totalExitWait += waitTime;
     this.trackWait(waitTime);
   }
@@ -63,6 +69,12 @@ export class ScoreSystem {
     this.penalties += SCORE.queuePenaltyPerSecond * dt;
   }
 
+  /** An emergency vehicle stood still for `dt` more seconds. */
+  addEmergencyWait(dt: number): void {
+    this.emergencyWaitSeconds += dt;
+    this.penalties += SCORE.emergencyWaitPenaltyPerSecond * dt;
+  }
+
   get avgWait(): number {
     return this.passed > 0 ? this.totalExitWait / this.passed : 0;
   }
@@ -73,7 +85,7 @@ export class ScoreSystem {
 
   /** Score shown live during play. */
   get liveScore(): number {
-    return Math.max(0, Math.round(this.passed * SCORE.perCar - this.penalties - this.crashes * SCORE.crashPenalty));
+    return Math.max(0, Math.round(this.exitPoints - this.penalties - this.crashes * SCORE.crashPenalty));
   }
 
   snapshot(): ScoreSnapshot {
@@ -81,7 +93,7 @@ export class ScoreSystem {
   }
 
   finalScore(outcome: GameOutcome, time: number, criteria: StarCriteria): number {
-    let score = this.passed * SCORE.perCar - this.penalties - this.crashes * SCORE.crashPenalty;
+    let score = this.exitPoints - this.penalties - this.crashes * SCORE.crashPenalty;
     if (outcome === 'win') {
       score += Math.max(0, criteria.parTime - time) * SCORE.timeBonusPerSecond;
       score += Math.max(0, criteria.avgWait - this.avgWait) * SCORE.waitBonusPerSecond;
@@ -90,14 +102,14 @@ export class ScoreSystem {
     return Math.max(0, Math.round(score));
   }
 
-  starBreakdown(outcome: GameOutcome, time: number, score: number, c: StarCriteria): { label: string; earned: boolean }[] {
+  starBreakdown(outcome: GameOutcome, time: number, score: number, c: StarCriteria): StarCheck[] {
     const win = outcome === 'win';
     return [
-      { label: 'Level complete', earned: win },
-      { label: `Finish under ${Math.round(c.parTime)}s`, earned: win && time <= c.parTime },
-      { label: `Avg wait ≤ ${c.avgWait.toFixed(1)}s`, earned: win && this.avgWait <= c.avgWait },
-      { label: `No car waits > ${Math.round(c.maxWait)}s`, earned: win && this.maxWait <= c.maxWait },
-      { label: `Score ≥ ${c.score}`, earned: win && score >= c.score },
+      { id: 'complete', value: 0, earned: win },
+      { id: 'par', value: Math.round(c.parTime), earned: win && time <= c.parTime },
+      { id: 'avgWait', value: c.avgWait, earned: win && this.avgWait <= c.avgWait },
+      { id: 'maxWait', value: Math.round(c.maxWait), earned: win && this.maxWait <= c.maxWait },
+      { id: 'score', value: c.score, earned: win && score >= c.score },
     ];
   }
 

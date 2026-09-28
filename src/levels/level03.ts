@@ -48,4 +48,9 @@ export const level03 = defineLevel({
   goal: { carsToPass: 28 },
   stars: { parTime: 60, avgWait: 6, maxWait: 16, score: 3500 },
   hint: 'Watch the left-turners: they cut across oncoming traffic.',
+  ru: {
+    name: 'Городской трафик',
+    description: 'Четыре направления, повороты и множество конфликтов.',
+    hint: 'Следите за левым поворотом: он пересекает встречный поток.',
+  },
 });

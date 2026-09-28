@@ -1,3 +1,5 @@
+import type { VehicleKind } from '../types';
+
 /** Visual palette and typography. */
 export const COLORS = {
   bg: 0x1b2130,
@@ -34,6 +36,17 @@ export const COLORS = {
 } as const;
 
 export const CAR_COLORS = [0xef476f, 0x118ab2, 0xffd166, 0x06d6a0, 0xf78c6b, 0x8d6cf0, 0xf1f1f1, 0x3a86ff, 0xff9f1c];
+export const BUS_COLORS = [0xffb703, 0x2f80ed, 0xe63946, 0x2a9d8f];
+export const TRUCK_COLORS = [0x3d5a80, 0xe76f51, 0x6a994e, 0x9d4edd];
+export const EMERGENCY_COLORS = { ambulance: 0xf8f9fa, police: 0x1d3557, fire: 0xd62828 } as const;
+
+/** Colour palette per vehicle kind. */
+export function paletteFor(kind: VehicleKind): readonly number[] {
+  if (kind === 'bus') return BUS_COLORS;
+  if (kind === 'truck') return TRUCK_COLORS;
+  if (kind === 'ambulance' || kind === 'police' || kind === 'fire') return [EMERGENCY_COLORS[kind]];
+  return CAR_COLORS;
+}
 
 export const FONT = {
   family: '"Segoe UI", "Helvetica Neue", Roboto, Arial, sans-serif',

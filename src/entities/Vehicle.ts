@@ -26,6 +26,10 @@ export class Vehicle {
   readonly accel: number;
   readonly brake: number;
   readonly route: RuntimeRoute;
+  /** Points awarded at the exit. */
+  readonly points: number;
+  readonly emergency: boolean;
+  readonly heavy: boolean;
 
   /** Arc-length position of the vehicle centre along its route. */
   s = 0;
@@ -44,6 +48,8 @@ export class Vehicle {
   nextStop = 0;
   /** Stops the car is committed to cross regardless of signal (cannot stop in time / yellow pass). */
   readonly committed = new Set<number>();
+  /** Conflict zones a yielding (free-turn) car has committed to enter. */
+  readonly committedZones = new Set<string>();
 
   x = 0;
   y = 0;
@@ -59,6 +65,9 @@ export class Vehicle {
     this.accel = init.spec.accel;
     this.brake = init.spec.brake;
     this.route = init.route;
+    this.points = init.spec.points;
+    this.emergency = init.spec.emergency === true;
+    this.heavy = init.spec.heavy === true;
     this.speed = init.speed;
     this.syncPose();
   }

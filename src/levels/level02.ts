@@ -14,7 +14,7 @@ export const level02 = defineLevel({
   description: 'A side street joins a busy avenue. Turning cars need a gap.',
   world,
   seed: 2202,
-  roads: [hRoad('avenue', Y), vRoad('side', X, Y, 5000)],
+  roads: [hRoad('avenue', Y), vRoad('side', X, { from: Y })],
   intersections: [I],
   lights: [
     light('L_W', I, 'E', LightState.GREEN),
@@ -44,4 +44,9 @@ export const level02 = defineLevel({
   goal: { carsToPass: 20 },
   stars: { parTime: 50, avgWait: 3.5, maxWait: 10, score: 2600 },
   hint: 'Avenue traffic can flow both ways at once — but the side street crosses both lanes.',
+  ru: {
+    name: 'Оживлённая дорога',
+    description: 'Боковая улица примыкает к оживлённому проспекту. Поворачивающим нужен разрыв в потоке.',
+    hint: 'Проспект может ехать в обе стороны сразу — но боковая улица пересекает обе полосы.',
+  },
 });

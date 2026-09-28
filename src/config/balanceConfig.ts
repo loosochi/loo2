@@ -30,15 +30,29 @@ export interface VehicleSpec {
   maxSpeed: [number, number];
   accel: number;
   brake: number;
+  /** Default spawn weight in a flow without an explicit mix (0 = only when asked for). */
   weight: number;
+  /** Points when the vehicle reaches an exit. */
+  points: number;
+  emergency?: boolean;
+  heavy?: boolean;
 }
 
 export const VEHICLE_SPECS: VehicleSpec[] = [
-  { kind: 'compact', length: 20, width: 12, maxSpeed: [72, 80], accel: 52, brake: 80, weight: 3 },
-  { kind: 'sedan', length: 24, width: 13, maxSpeed: [76, 86], accel: 46, brake: 76, weight: 4 },
-  { kind: 'hatch', length: 21, width: 12.5, maxSpeed: [70, 78], accel: 50, brake: 80, weight: 3 },
-  { kind: 'sport', length: 23, width: 12.5, maxSpeed: [86, 96], accel: 62, brake: 90, weight: 1 },
+  { kind: 'compact', length: 20, width: 12, maxSpeed: [72, 80], accel: 52, brake: 80, weight: 3, points: 100 },
+  { kind: 'sedan', length: 24, width: 13, maxSpeed: [76, 86], accel: 46, brake: 76, weight: 4, points: 100 },
+  { kind: 'hatch', length: 21, width: 12.5, maxSpeed: [70, 78], accel: 50, brake: 80, weight: 3, points: 100 },
+  { kind: 'sport', length: 23, width: 12.5, maxSpeed: [86, 96], accel: 62, brake: 90, weight: 1, points: 100 },
+  // Heavy vehicles: long, slow to accelerate — they clog junctions if you are careless.
+  { kind: 'bus', length: 46, width: 15, maxSpeed: [60, 66], accel: 26, brake: 60, weight: 0, points: 250, heavy: true },
+  { kind: 'truck', length: 40, width: 15, maxSpeed: [62, 70], accel: 28, brake: 58, weight: 0, points: 150, heavy: true },
+  // Emergency vehicles: give them a green wave — every second they wait costs points.
+  { kind: 'ambulance', length: 27, width: 14, maxSpeed: [92, 100], accel: 60, brake: 90, weight: 0, points: 300, emergency: true },
+  { kind: 'police', length: 24, width: 13, maxSpeed: [96, 104], accel: 66, brake: 92, weight: 0, points: 300, emergency: true },
+  { kind: 'fire', length: 38, width: 15, maxSpeed: [84, 90], accel: 40, brake: 72, weight: 0, points: 300, emergency: true, heavy: true },
 ];
+
+export const specOf = (kind: VehicleKind): VehicleSpec => VEHICLE_SPECS.find((v) => v.kind === kind)!;
 
 export const DRIVING = {
   /** Emergency braking = brake × this factor. */
@@ -67,6 +81,10 @@ export const DRIVING = {
   zoneSafetyHorizon: 1.8,
   /** OBB shrink factor used for crash detection (tolerance for near misses). */
   collisionTolerance: 0.88,
+  /** Seconds of look-ahead a yielding (free-turn) car needs before merging. */
+  yieldHorizon: 2.6,
+  /** Distance before a conflict zone at which a yielding car commits to merging. */
+  yieldCommit: 10,
 } as const;
 
 export const SCORE = {
@@ -82,4 +100,6 @@ export const SCORE = {
   longWaitPenaltyPerSecond: 4,
   /** Penalty per second a spawn point is blocked by a queue. */
   queuePenaltyPerSecond: 6,
+  /** Penalty per second an emergency vehicle is standing still. */
+  emergencyWaitPenaltyPerSecond: 30,
 } as const;

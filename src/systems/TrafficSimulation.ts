@@ -60,7 +60,7 @@ export class TrafficSimulation {
     this.lights = new TrafficLightSystem(level.lights);
     this.lights.bindRoutes(this.routes);
     this.collisions.buildZones(this.routes);
-    this.spawner = new VehicleSpawner(level.flows, this.routes, level.seed);
+    this.spawner = new VehicleSpawner(level.flows, this.routes, level.seed, level.specials ?? []);
     this.lights.onChange((c) => this.events.light?.(c));
   }
 
@@ -155,6 +155,7 @@ export class TrafficSimulation {
 
       if (v.speed < DRIVING.waitingSpeed && v.age > DRIVING.spawnTime) {
         v.waitTime += dt;
+        if (v.emergency) this.score.addEmergencyWait(dt);
         if (v.waitTime > SCORE.longWaitThreshold) this.score.addLongWait(dt);
         this.score.trackWait(v.waitTime);
       }
@@ -162,7 +163,7 @@ export class TrafficSimulation {
     }
     for (const v of exited) {
       this.vehicles.splice(this.vehicles.indexOf(v), 1);
-      this.score.onVehicleExit(v.waitTime);
+      this.score.onVehicleExit(v.waitTime, v.points);
       this.events.exit?.(v);
     }
 
@@ -246,6 +247,7 @@ export class TrafficSimulation {
    * or null when it may proceed.
    */
   private resolveStop(v: Vehicle, leader: { gap: number } | null): number | null {
+    if (v.route.def.free) return this.resolveYield(v);
     const stops = v.route.stops;
     for (let i = v.nextStop; i < stops.length; i++) {
       const stop = stops[i];
@@ -282,6 +284,33 @@ export class TrafficSimulation {
         continue;
       }
       return stop.s;
+    }
+    return null;
+  }
+
+  /**
+   * Free (slip-lane) turns have no signal: before each conflict zone the car checks that no
+   * conflicting traffic is inside or arriving soon, otherwise it waits at the yield point.
+   */
+  private resolveYield(v: Vehicle): number | null {
+    for (const rz of v.route.zones) {
+      if (v.committedZones.has(rz.zone.id)) continue;
+      const dist = rz.sEnter - v.front;
+      if (dist < 0) {
+        v.committedZones.add(rz.zone.id);
+        continue;
+      }
+      if (dist > STOP_SCAN) return null;
+      const clear = this.collisions.isZoneClear(v, rz, this.vehicles, DRIVING.yieldHorizon);
+      if (clear) {
+        if (dist < DRIVING.yieldCommit) v.committedZones.add(rz.zone.id);
+        continue;
+      }
+      if (v.requiredDecel(dist - DRIVING.stopLineGap - 2) > v.emergencyBrake) {
+        v.committedZones.add(rz.zone.id); // too late to stop
+        continue;
+      }
+      return rz.sEnter - 2;
     }
     return null;
   }

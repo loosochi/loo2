@@ -28,4 +28,9 @@ export const level01 = defineLevel({
   goal: { carsToPass: 12 },
   stars: { parTime: 40, avgWait: 2.5, maxWait: 7, score: 1800 },
   hint: 'Tap a light to switch RED ⇄ GREEN. Hold it for YELLOW: exactly one car may pass.',
+  ru: {
+    name: 'Первый перекрёсток',
+    description: 'Два потока встречаются на тихом перекрёстке. Пропускайте по очереди.',
+    hint: 'Нажмите на светофор: КРАСНЫЙ ⇄ ЗЕЛЁНЫЙ. Удерживайте для ЖЁЛТОГО — проедет ровно одна машина.',
+  },
 });

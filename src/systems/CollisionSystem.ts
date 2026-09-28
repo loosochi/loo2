@@ -140,7 +140,7 @@ export class CollisionSystem {
    * Safe-passage check before entering a zone: no vehicle on a conflicting route is inside
    * it or about to enter it without stopping.
    */
-  isZoneClear(v: Vehicle, rz: RouteZone, vehicles: readonly Vehicle[], horizon = DRIVING.zoneSafetyHorizon): boolean {
+  isZoneClear(v: Vehicle, rz: RouteZone, vehicles: readonly Vehicle[], horizon: number = DRIVING.zoneSafetyHorizon): boolean {
     for (const o of vehicles) {
       if (o === v || !this.routesConflict(rz.zone, v.route.id, o.route.id)) continue;
       const orz = o.route.zones.find((e) => e.zone === rz.zone);
