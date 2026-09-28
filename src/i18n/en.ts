@@ -6,6 +6,7 @@ export const en = {
   'common.off': 'OFF',
   'common.back': 'BACK',
   'common.seconds': '{v} s',
+  'common.player': 'Player',
 
   'menu.subtitle': 'Keep the city moving. Avoid the crash.',
   'menu.play': 'PLAY  ·  LEVEL {n}',

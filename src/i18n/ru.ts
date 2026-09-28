@@ -8,6 +8,7 @@ export const ru: Record<keyof typeof en, string> = {
   'common.off': 'ВЫКЛ',
   'common.back': 'НАЗАД',
   'common.seconds': '{v} с',
+  'common.player': 'Игрок',
 
   'menu.subtitle': 'Не дайте городу встать. Избегайте аварий.',
   'menu.play': 'ИГРАТЬ  ·  УРОВЕНЬ {n}',

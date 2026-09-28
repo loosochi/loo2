@@ -356,7 +356,7 @@ export class GameScene extends Phaser.Scene {
       newBest = lm.save.recordResult(result.levelId, win, result.score, result.stars);
       if (win) {
         rank = lm.records.submit(result.levelId, {
-          name: lm.save.playerName || 'Player',
+          name: lm.save.playerName || t('common.player'),
           score: result.score,
           stars: result.stars,
           time: Math.round(result.time * 10) / 10,

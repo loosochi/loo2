@@ -285,9 +285,9 @@ export class WorldRenderer {
       // Triangles point towards approaching traffic.
       g.fillTriangle(cx - dx * 5 + nx * 2.8, cy - dy * 5 + ny * 2.8, cx - dx * 5 - nx * 2.8, cy - dy * 5 - ny * 2.8, cx + dx * 1, cy + dy * 1);
     }
-    // Yield sign on the left edge of the slip lane (the traffic island).
-    const sx = p.x - nx * (ROAD.laneWidth / 2 + 8) - dx * 8;
-    const sy = p.y - ny * (ROAD.laneWidth / 2 + 8) - dy * 8;
+    // Yield sign on the inner (island) side of the slip lane.
+    const sx = p.x + nx * (ROAD.laneWidth / 2 + 7) - dx * 8;
+    const sy = p.y + ny * (ROAD.laneWidth / 2 + 7) - dy * 8;
     const pts = [0, 1, 2].map((k) => {
       const a = h + Math.PI + (k * Math.PI * 2) / 3;
       return new Phaser.Math.Vector2(sx + Math.cos(a) * 7, sy + Math.sin(a) * 7);

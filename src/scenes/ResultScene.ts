@@ -80,7 +80,7 @@ export class ResultScene extends Phaser.Scene {
       [t('result.crashes'), String(r.crashes)],
     ];
     const lineH = 25 * s;
-    const headerH = 162 * s + (rank ? 20 * s : 0);
+    const headerH = 164 * s + (rank ? 20 * s : 0);
     const statsH = statRows.length * lineH + 12 * s;
     const breakdownH = win ? r.starBreakdown.length * 20 * s + 14 * s : 0;
     const buttonsH = rowButtons ? bh + 20 * s : buttons.length * (bh + 10 * s) + 10 * s;
@@ -95,7 +95,7 @@ export class ResultScene extends Phaser.Scene {
     this.root.add(g);
 
     const heading = win ? t('result.complete') : r.outcome === 'crash' ? t('result.crash') : t('result.timeout');
-    const head = makeText(this, W / 2, py + 44 * s, heading, { size: 30 * s, bold: true, color: win ? COLORS.good : COLORS.bad }).setOrigin(0.5);
+    const head = makeText(this, W / 2, py + 46 * s, heading, { size: 30 * s, bold: true, color: win ? COLORS.good : COLORS.bad }).setOrigin(0.5);
     while (head.width > pw - 24 && parseFloat(String(head.style.fontSize)) > 14) head.setFontSize(parseFloat(String(head.style.fontSize)) - 1);
     this.root.add(head);
     this.root.add(

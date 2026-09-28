@@ -50,6 +50,7 @@ export class EditorScene extends Phaser.Scene {
   private status!: Phaser.GameObjects.Text;
   private toastText: Phaser.GameObjects.Text | null = null;
   private checking = false;
+  private frame: Phaser.GameObjects.Graphics | null = null;
 
   constructor() {
     super('Editor');
@@ -61,6 +62,7 @@ export class EditorScene extends Phaser.Scene {
     this.model = store.load(this.slot, t('editor.name', { n: this.slot + 1 }));
     this.panelLayer = null;
     this.worldView = null;
+    this.frame = null;
     this.checking = false;
   }
 
@@ -114,8 +116,22 @@ export class EditorScene extends Phaser.Scene {
 
   private rebuildPreview(): void {
     this.worldView?.destroy();
+    this.frame?.destroy();
     this.sim = new TrafficSimulation(this.previewLevel());
     this.worldView = new WorldRenderer(this, this.sim, this.view.worldLayer);
+    // Dim everything outside the editable map and outline it.
+    const { width: W, height: H } = EDITOR_WORLD;
+    const P = 3000;
+    const f = this.add.graphics().setDepth(20);
+    f.fillStyle(COLORS.bgDeep, 0.55);
+    f.fillRect(-P, -P, W + P * 2, P);
+    f.fillRect(-P, H, W + P * 2, P);
+    f.fillRect(-P, 0, P, H);
+    f.fillRect(W, 0, P, H);
+    f.lineStyle(3, 0xffffff, 0.7);
+    f.strokeRect(0, 0, W, H);
+    this.view.worldLayer.add(f);
+    this.frame = f;
     this.worldView.showDanger = false;
     this.fit();
     this.worldView.update(0);
@@ -247,19 +263,23 @@ export class EditorScene extends Phaser.Scene {
   }
 
   private toast(text: string, color: number = COLORS.warn): void {
-    this.toastText?.destroy();
+    this.toastText?.parentContainer?.destroy();
     const s = uiScale(this);
-    const txt = makeText(this, this.scale.width / 2, this.top + 18 * s, text, {
-      size: 14 * s,
-      bold: true,
-      color,
-      align: 'center',
-      wrap: this.scale.width - 40,
-    }).setOrigin(0.5, 0);
-    txt.setShadow(0, 2, 'rgba(0,0,0,0.8)', 6);
-    this.ui.add(txt);
+    const W = this.scale.width;
+    const txt = makeText(this, 0, 0, text, { size: 14 * s, bold: true, color, align: 'center', wrap: Math.min(W - 60, 560) }).setOrigin(0.5);
+    const w = txt.width + 32 * s;
+    const h = txt.height + 18 * s;
+    const g = this.add.graphics();
+    g.fillStyle(0x000000, 0.3);
+    g.fillRoundedRect(-w / 2 + 2, -h / 2 + 4, w, h, 12);
+    g.fillStyle(COLORS.panel, 0.97);
+    g.fillRoundedRect(-w / 2, -h / 2, w, h, 12);
+    g.lineStyle(1.5, color, 0.8);
+    g.strokeRoundedRect(-w / 2, -h / 2, w, h, 12);
+    const c = this.add.container(W / 2, this.top + h / 2 + 12 * s, [g, txt]);
+    this.ui.add(c);
     this.toastText = txt;
-    this.tweens.add({ targets: txt, alpha: 0, delay: 3200, duration: 400, onComplete: () => txt.destroy() });
+    this.tweens.add({ targets: c, alpha: 0, delay: 3200, duration: 400, onComplete: () => c.destroy() });
   }
 
   // ------------------------------------------------------------------ actions

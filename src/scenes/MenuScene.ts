@@ -171,7 +171,7 @@ export class MenuScene extends Phaser.Scene {
     const lm = levelManager();
     this.modal?.destroy();
     const soundLabel = () => t('settings.sound', { state: lm.save.soundEnabled ? t('common.on') : t('common.off') });
-    const nameLabel = () => t('settings.name', { name: lm.save.playerName || 'Player' });
+    const nameLabel = () => t('settings.name', { name: lm.save.playerName || t('common.player') });
     const modal = new Modal(this, {
       title: t('settings.title'),
       buttons: [
@@ -208,7 +208,7 @@ export class MenuScene extends Phaser.Scene {
             openDialog({
               title: t('settings.nameTitle'),
               value: lm.save.playerName,
-              placeholder: 'Player',
+              placeholder: t('common.player'),
               maxLength: 16,
               buttons: [
                 { label: t('common.cancel'), action: () => undefined },

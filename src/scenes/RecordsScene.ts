@@ -79,9 +79,7 @@ export class RecordsScene extends Phaser.Scene {
     const px = (W - pw) / 2;
     const sy = pad + btn + 18 * s + btn / 2;
     this.root.add(new Button(this, px + btn / 2, sy, { icon: 'back', width: btn, height: btn, style: 'secondary', onClick: () => this.switchLevel(-1) }));
-    const nextBtn = new Button(this, px + pw - btn / 2, sy, { icon: 'back', width: btn, height: btn, style: 'secondary', onClick: () => this.switchLevel(1) });
-    nextBtn.setAngle(180);
-    this.root.add(nextBtn);
+    this.root.add(new Button(this, px + pw - btn / 2, sy, { icon: 'forward', width: btn, height: btn, style: 'secondary', onClick: () => this.switchLevel(1) }));
     const label = makeText(this, W / 2, sy - 9 * s, t('hud.level', { n: level.id }), { size: 12 * s, bold: true, color: COLORS.accent }).setOrigin(0.5);
     const nm = makeText(this, W / 2, sy + 9 * s, levelName(level), { size: 18 * s, bold: true }).setOrigin(0.5);
     while (nm.width > pw - btn * 2 - 20 && parseFloat(String(nm.style.fontSize)) > 10) nm.setFontSize(parseFloat(String(nm.style.fontSize)) - 1);
@@ -115,7 +113,7 @@ export class RecordsScene extends Phaser.Scene {
         makeText(this, W / 2, top + ph / 2 + 8 * s, t('records.empty'), { size: 14 * s, color: COLORS.textDim, align: 'center', wrap: pw - 40 }).setOrigin(0.5),
       );
     }
-    const me = lm.save.playerName || 'Player';
+    const me = lm.save.playerName || t('common.player');
     list.forEach((e, i) => {
       const y = top + 14 * s + rowH * (i + 1);
       if (i % 2 === 0) {

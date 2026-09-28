@@ -66,6 +66,7 @@ export type IconName =
   | 'play'
   | 'restart'
   | 'back'
+  | 'forward'
   | 'lock'
   | 'sound'
   | 'mute'
@@ -117,6 +118,13 @@ export function drawIcon(g: Phaser.GameObjects.Graphics, name: IconName, s: numb
       g.moveTo(h * 0.2, -h * 0.6);
       g.lineTo(-h * 0.4, 0);
       g.lineTo(h * 0.2, h * 0.6);
+      g.strokePath();
+      break;
+    case 'forward':
+      g.beginPath();
+      g.moveTo(-h * 0.2, -h * 0.6);
+      g.lineTo(h * 0.4, 0);
+      g.lineTo(-h * 0.2, h * 0.6);
       g.strokePath();
       break;
     case 'lock':

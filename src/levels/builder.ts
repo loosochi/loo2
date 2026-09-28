@@ -30,7 +30,7 @@ export const OFFSCREEN = 60;
 /** Roads extend this far beyond the world so edges never look cut off. */
 export const ROAD_OVERHANG = 1200;
 /** Corner radius of a slip-lane (free) right turn. */
-export const SLIP_RADIUS = 74;
+export const SLIP_RADIUS = 90;
 
 const isHorizontal = (d: Dir): boolean => d === 'E' || d === 'W';
 
