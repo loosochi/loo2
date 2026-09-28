@@ -63,6 +63,8 @@ export function levelHint(level: LevelDef): string | undefined {
 export function levelLabel(level: LevelDef): string {
   if (level.custom) return t('hud.custom');
   if (level.id === 0) return t('hud.tutorial');
+  // Campaign 2.0 ids start at 101.
+  if (level.id > 100) return t('hud.level', { n: level.id - 100 });
   return t('hud.level', { n: level.id });
 }
 

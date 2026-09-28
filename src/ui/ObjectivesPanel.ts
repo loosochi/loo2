@@ -28,6 +28,8 @@ export class ObjectivesPanel {
   readonly root: Phaser.GameObjects.Container;
   private collapsed = false;
   private lastKey = '';
+  /** Screen height currently used (0 when empty). */
+  height = 0;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -42,6 +44,7 @@ export class ObjectivesPanel {
     if (key === this.lastKey) return;
     this.lastKey = key;
     this.root.removeAll(true);
+    this.height = 0;
     if (!states.length) return;
     const s = uiScale(this.scene);
     const W = this.scene.scale.width;
@@ -50,6 +53,7 @@ export class ObjectivesPanel {
     const ph = 26 * s + (this.collapsed ? 0 : states.length * rowH + 4);
     const x = 8;
     const y = top + 8;
+    this.height = ph + 8;
     const g = this.scene.add.graphics();
     g.fillStyle(COLORS.bgDeep, 0.82);
     g.fillRoundedRect(x, y, pw, ph, 10);

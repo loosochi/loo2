@@ -45,6 +45,8 @@ export class HUD {
   pauseButton: Button | null = null;
   fitButton: Button | null = null;
   private hintText: Phaser.GameObjects.Text | null = null;
+  /** Extra space under the top bar taken by other panels (toasts go below it). */
+  extraTop = 0;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -196,7 +198,7 @@ export class HUD {
     g.fillRoundedRect(-w / 2 + 2, -h / 2 + 4, w, h, 12);
     g.fillStyle(color, 0.97);
     g.fillRoundedRect(-w / 2, -h / 2, w, h, 12);
-    const c = scene.add.container(W / 2, this.top + h / 2 + 12, [g, txt]);
+    const c = scene.add.container(W / 2, this.top + this.extraTop + h / 2 + 12, [g, txt]);
     c.setAlpha(0);
     c.y -= 10;
     this.root.add(c);

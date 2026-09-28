@@ -8,6 +8,7 @@ import { BUILD_COSTS } from '../src/config/balanceConfig';
 import { validateNetwork } from '../src/editor/LevelValidator';
 import { RoadNetwork } from '../src/graph/RoadNetwork';
 import { TrafficSimulation } from '../src/systems/TrafficSimulation';
+import { LightState } from '../src/types';
 import { crossNetwork, levelFrom, WORLD } from './netHelpers';
 
 function tNetwork(): RoadNetwork {
@@ -171,6 +172,8 @@ describe('LevelValidator', () => {
 describe('TrafficAnalytics', () => {
   it('measures load, speed, flow and junction throughput', () => {
     const net = crossNetwork({ lights: true, count: 10 });
+    // Hold every approach at red (new lights otherwise start with one axis green).
+    for (const l of net.data.lights) l.initial = LightState.RED;
     const sim = new TrafficSimulation(levelFrom(net.data));
     const an = new TrafficAnalytics(sim, net);
     for (let i = 0; i < 60 * 25; i++) {
@@ -192,5 +195,15 @@ describe('TrafficAnalytics', () => {
     expect(an.global().vehicles).toBe(sim.vehicles.length);
     expect(loadLevel(0.1)).toBe('LOW');
     expect(loadLevel(0.9)).toBe('CRITICAL');
+  });
+});
+
+describe('Default light phase', () => {
+  it('starts new lights with one axis green and the crossing axis red', () => {
+    const net = crossNetwork({ lights: true, count: 4 });
+    const lvl = levelFrom(net.data);
+    const states = lvl.lights.map((l) => l.initial);
+    expect(states.filter((s) => s === LightState.GREEN).length).toBe(2);
+    expect(states.filter((s) => s === LightState.RED).length).toBe(2);
   });
 });

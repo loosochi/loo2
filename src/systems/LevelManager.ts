@@ -1,4 +1,4 @@
-import { LAST_LEVEL_ID, LEVELS, getLevel } from '../levels/levelRegistry';
+import { CAMPAIGN2, FIRST_CAMPAIGN_ID, LAST_CAMPAIGN_ID, LAST_LEVEL_ID, LEVELS, getLevel } from '../levels/levelRegistry';
 import type { LevelDef } from '../types';
 import { EditorStore } from '../editor/EditorStore';
 import { Leaderboard } from './Leaderboard';
@@ -12,13 +12,19 @@ export class LevelManager {
 
   constructor(save?: SaveManager, records?: Leaderboard) {
     const store = detectStore();
-    this.save = save ?? new SaveManager(LAST_LEVEL_ID, store);
+    this.save = save ?? new SaveManager(LAST_LEVEL_ID, store, { first: FIRST_CAMPAIGN_ID, last: LAST_CAMPAIGN_ID });
     this.records = records ?? new Leaderboard(store);
     this.editor = new EditorStore(store);
   }
 
+  /** Classic levels (tutorial + 9 light-only levels). */
   get levels(): readonly LevelDef[] {
     return LEVELS;
+  }
+
+  /** Campaign 2.0: road-building levels. */
+  get campaign(): readonly LevelDef[] {
+    return CAMPAIGN2;
   }
 
   get(id: number): LevelDef | undefined {
@@ -40,9 +46,14 @@ export class LevelManager {
     return Math.min(snap.unlocked, LAST_LEVEL_ID);
   }
 
+  /** Next Campaign 2.0 level to play: the highest unlocked one. */
+  campaignTarget(): number {
+    return Math.min(this.save.snapshot.campaignUnlocked, LAST_CAMPAIGN_ID);
+  }
+
   /** Campaign levels that award stars (everything except the tutorial). */
   get starLevels(): readonly LevelDef[] {
-    return LEVELS.filter((l) => l.id > 0);
+    return [...LEVELS.filter((l) => l.id > 0), ...CAMPAIGN2];
   }
 
   get totalStars(): number {

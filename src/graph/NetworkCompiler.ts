@@ -168,6 +168,28 @@ export function lightGeometry(net: RoadNetwork, nodeId: string, edgeId: string):
   return { stop, head, width: lanesIn * LW, angle, dir };
 }
 
+/**
+ * Starting state of a light without an explicit one: approaches along the junction's main road
+ * (or, without one, along the first light placed there) start GREEN, crossing approaches RED —
+ * a sensible first phase instead of an all-red junction.
+ */
+function defaultPhase(net: RoadNetwork, nodeId: string, edgeId: string): LightState {
+  const node = net.node(nodeId);
+  if (!node) return LightState.RED;
+  const pair = mainPair(net, node);
+  if (pair) return pair.includes(edgeId) ? LightState.GREEN : LightState.RED;
+  const first = net.data.lights.find((l) => l.node === nodeId && !l.initial);
+  if (!first) return LightState.RED;
+  const dir = (id: string) => {
+    const e = net.edge(id);
+    const o = e && net.node(net.other(e, nodeId));
+    return o ? Math.atan2(o.y - node.y, o.x - node.x) : 0;
+  };
+  // Same axis (either side of the junction) as the first light → same phase.
+  const diff = Math.abs(Math.sin(dir(edgeId) - dir(first.edge)));
+  return diff < 0.5 ? LightState.GREEN : LightState.RED;
+}
+
 export function compileNetwork(net: RoadNetwork, world: { width: number; height: number }): CompiledNetwork {
   const pf = new PathFinder(net);
   const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
@@ -177,7 +199,7 @@ export function compileNetwork(net: RoadNetwork, world: { width: number; height:
   for (const l of d.lights) {
     const g = lightGeometry(net, l.node, l.edge);
     if (!g) continue;
-    lights.push({ id: lightId(l.node, l.edge), ...g, initial: l.initial ?? LightState.RED });
+    lights.push({ id: lightId(l.node, l.edge), ...g, initial: l.initial ?? defaultPhase(net, l.node, l.edge) });
   }
   const lightSet = new Set(d.lights.map((l) => `${l.node}|${l.edge}`));
 

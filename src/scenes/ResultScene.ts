@@ -5,6 +5,7 @@ import { audio } from '../systems/AudioManager';
 import { levelManager } from '../systems/LevelManager';
 import type { LevelDef, LevelResult } from '../types';
 import { Button } from '../ui/Button';
+import { objectiveLabel } from '../ui/ObjectivesPanel';
 import type { IconName } from '../ui/uiKit';
 import { drawStar, enterScene, goTo, makeText, panel, uiScale } from '../ui/uiKit';
 import { formatTime } from '../utils/math';
@@ -17,6 +18,8 @@ export interface ResultData {
   rank: number | null;
   custom?: boolean;
   editorSlot?: number;
+  customId?: string;
+  fromEditor?: boolean;
 }
 
 /** Win / lose summary: stats, stars and navigation. */
@@ -44,7 +47,7 @@ export class ResultScene extends Phaser.Scene {
 
   private build(animate: boolean): void {
     this.root.removeAll(true);
-    const { result: r, newBest, level, rank, custom } = this.data_;
+    const { result: r, newBest, level, rank, custom, customId } = this.data_;
     const lm = levelManager();
     const next = custom ? undefined : lm.next(level.id);
     const win = r.outcome === 'win';
@@ -60,13 +63,36 @@ export class ResultScene extends Phaser.Scene {
     const pw = Math.min(W - 24, 470 * s);
     const buttons: { label: string; icon: IconName; style: 'primary' | 'secondary'; go: () => void }[] = [];
     const retry = () =>
-      goTo(this, 'Game', custom ? { custom: level, editorSlot: this.data_.editorSlot } : { levelId: level.id });
-    if (win && next) buttons.push({ label: t('result.next'), icon: 'next', style: 'primary', go: () => goTo(this, 'Game', { levelId: next.id }) });
-    buttons.push({ label: t('result.retry'), icon: 'restart', style: buttons.length ? 'secondary' : 'primary', go: retry });
-    if (custom) {
+      goTo(
+        this,
+        'Game',
+        custom ? { custom: level, editorSlot: this.data_.editorSlot, customId, fromEditor: this.data_.fromEditor } : { levelId: level.id },
+      );
+    if (customId) {
+      // Custom road-network level (editor 2.0): EDIT / RESTART / BACK.
+      buttons.push(
+        { label: t('result.edit'), icon: 'edit', style: 'primary', go: () => goTo(this, 'Editor', { customId }) },
+        { label: t('pause.restart'), icon: 'restart', style: 'secondary', go: retry },
+        {
+          label: t('result.back'),
+          icon: 'back',
+          style: 'secondary',
+          go: () => (this.data_.fromEditor ? goTo(this, 'Editor', { customId }) : goTo(this, 'LevelSelect', { tab: 'custom' })),
+        },
+      );
+    } else if (win && next) buttons.push({ label: t('result.next'), icon: 'next', style: 'primary', go: () => goTo(this, 'Game', { levelId: next.id }) });
+    if (!customId) buttons.push({ label: t('result.retry'), icon: 'restart', style: buttons.length ? 'secondary' : 'primary', go: retry });
+    if (customId) {
+      /* buttons above */
+    } else if (custom) {
       buttons.push({ label: t('result.editor'), icon: 'edit', style: 'secondary', go: () => goTo(this, 'Editor', { slot: this.data_.editorSlot }) });
     } else {
-      buttons.push({ label: t('result.levelSelect'), icon: 'grid', style: 'secondary', go: () => goTo(this, 'LevelSelect') });
+      buttons.push({
+        label: t('result.levelSelect'),
+        icon: 'grid',
+        style: 'secondary',
+        go: () => goTo(this, 'LevelSelect', { tab: level.network ? 'campaign' : 'classic' }),
+      });
       if (win) buttons.push({ label: t('menu.records'), icon: 'trophy', style: 'secondary', go: () => goTo(this, 'Records', { levelId: level.id }) });
     }
 
@@ -79,12 +105,15 @@ export class ResultScene extends Phaser.Scene {
       [t('result.maxWait'), t('common.seconds', { v: r.maxWait.toFixed(1) })],
       [t('result.crashes'), String(r.crashes)],
     ];
+    if (r.spent !== undefined) statRows.push([t('result.spent'), `$${Math.round(r.spent)}`]);
+    const objectives = r.objectives ?? [];
     const lineH = 25 * s;
     const headerH = 164 * s + (rank ? 20 * s : 0);
     const statsH = statRows.length * lineH + 12 * s;
     const breakdownH = win ? r.starBreakdown.length * 20 * s + 14 * s : 0;
     const buttonsH = rowButtons ? bh + 20 * s : buttons.length * (bh + 10 * s) + 10 * s;
-    const ph = headerH + statsH + breakdownH + buttonsH + 16 * s;
+    const objH = objectives.length ? objectives.length * 20 * s + 26 * s : 0;
+    const ph = headerH + statsH + objH + breakdownH + buttonsH + 16 * s;
     const px = (W - pw) / 2;
     const py = Math.max(8, (H - ph) / 2);
 
@@ -94,7 +123,13 @@ export class ResultScene extends Phaser.Scene {
     g.fillRoundedRect(px, py, pw, 8 * s, { tl: 22, tr: 22, bl: 0, br: 0 });
     this.root.add(g);
 
-    const heading = win ? t('result.complete') : r.outcome === 'crash' ? t('result.crash') : t('result.timeout');
+    const heading = win
+      ? t('result.complete')
+      : r.outcome === 'crash'
+        ? t('result.crash')
+        : r.outcome === 'failed'
+          ? t('result.failed')
+          : t('result.timeout');
     const head = makeText(this, W / 2, py + 46 * s, heading, { size: 30 * s, bold: true, color: win ? COLORS.good : COLORS.bad }).setOrigin(0.5);
     while (head.width > pw - 24 && parseFloat(String(head.style.fontSize)) > 14) head.setFontSize(parseFloat(String(head.style.fontSize)) - 1);
     this.root.add(head);
@@ -140,6 +175,19 @@ export class ResultScene extends Phaser.Scene {
       this.root.add(makeText(this, lx, y, k, { size: 15 * s, color: COLORS.textDim }));
       this.root.add(makeText(this, rx, y, v, { size: 15 * s, bold: true, mono: true }).setOrigin(1, 0));
       y += lineH;
+    }
+    if (objectives.length) {
+      y += 6 * s;
+      this.root.add(makeText(this, lx, y, t('obj.title'), { size: 12 * s, bold: true, color: COLORS.accent }));
+      y += 20 * s;
+      for (const o of objectives) {
+        const ok = o.status === 'done';
+        const color = ok ? COLORS.good : o.status === 'failed' ? COLORS.bad : COLORS.textDim;
+        const line = makeText(this, lx, y, `${ok ? '✓' : o.status === 'failed' ? '✗' : '•'} ${objectiveLabel(o)}`, { size: 12.5 * s, color });
+        while (line.width > pw - 56 * s && parseFloat(String(line.style.fontSize)) > 8) line.setFontSize(parseFloat(String(line.style.fontSize)) - 0.5);
+        this.root.add(line);
+        y += 20 * s;
+      }
     }
     if (win) {
       y += 6 * s;
