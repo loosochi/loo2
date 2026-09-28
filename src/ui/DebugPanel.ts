@@ -36,7 +36,10 @@ export class DebugPanel {
     const bg = this.scene.add.graphics();
     this.text = makeText(this.scene, x + 10, y + 8, '', { size: 11 * s, mono: true, color: COLORS.text });
     this.root.add([bg, this.text]);
-    let bottom = y + 8 + 14 * 11 * s;
+    // Reserve room for the title + 11 stat lines before the switches.
+    this.text.setText(new Array(12).fill('M').join('\n'));
+    let bottom = y + 16 + this.text.height;
+    this.text.setText('');
     if (this.flags) {
       const keys = Object.keys(this.flags) as (keyof DebugFlags)[];
       const bh = 44;

@@ -181,7 +181,8 @@ export class BuildController {
   }
 
   private updateBudget(): void {
-    if (!this.budgetText) return;
+    // The text may already be gone while the scene shuts down.
+    if (!this.budgetText?.active) return;
     const b = this.m.budget;
     if (b.unlimited) {
       this.budgetText.setText(t('budget.unlimited'));
@@ -598,7 +599,11 @@ export class BuildController {
   }
 
   destroy(): void {
-    this.cancelDrag();
+    this.budgetText = null;
+    this.drag = null;
+    this.plan = null;
+    if (this.label?.active) this.label.destroy();
+    this.label = null;
     this.toolbar.destroy();
     this.inspector.destroy();
     this.dock.destroy();

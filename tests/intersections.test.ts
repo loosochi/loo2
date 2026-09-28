@@ -120,3 +120,18 @@ describe('LaneSystem', () => {
     expect(run([2, 0])).toBeGreaterThanOrEqual(run([1, 0]));
   });
 });
+
+describe('partly signalled junctions', () => {
+  it('a single light plus give-way traffic never crashes, whatever the light shows', () => {
+    for (const which of [0, 1, 2, 3]) {
+      const net = star(shapes_cross());
+      const j = centre(net);
+      net.setLight(j.id, net.edgesAt(j.id)[which].id, true);
+      const sim = new TrafficSimulation(levelFrom(net.data));
+      for (let i = 0; i < 60 * 200 && sim.status === 'running'; i++) sim.step();
+      expect(sim.outcome, `light on approach ${which}`).not.toBe('crash');
+      // A green light never starves the others: everybody gets through.
+      if (sim.lights.lights[0].state === 'GREEN') expect(sim.outcome).toBe('win');
+    }
+  });
+});

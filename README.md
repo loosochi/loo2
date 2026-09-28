@@ -69,16 +69,58 @@ Pulsing red circles warn about conflict zones that two vehicles are about to sha
 
 Every level (and editor-made grids) is verified winnable in the tests by an adaptive signal controller.
 
+## Campaign 2.0 — building roads
+
+**PLAY** starts the road-building campaign (the tutorial first for new players). Every level needs an
+infrastructure decision; traffic only runs once the network is valid.
+
+* **Modes** (bottom bar): **BUILD** — traffic is frozen, the toolbar is shown; **TRAFFIC** — the
+  simulation runs, tap lights to switch them; **STATS** — traffic runs with a load overlay
+  (LOW / MEDIUM / HIGH / CRITICAL) and tap-to-inspect.
+* **Tools**: ROAD (tap → drag → release; live VALID / INVALID preview with length, cost and the reason;
+  snapping to nodes, roads and the grid; straight in 8 directions, L-shaped otherwise; automatic
+  junctions), DELETE (with "DELETE ROAD?" confirmation; fixed roads and roads with cars are refused),
+  TRAFFIC LIGHT (tap a junction approach), LANE (1–3 per direction, tap a side of the road), DIRECTION
+  (two-way → one-way → other way), INTERSECTION (right of way: auto / all-way / chosen main road),
+  INSPECT, plus UNDO / REDO, GRID and SNAP toggles. Levels lock tools they do not need.
+* **Budget**: AVAILABLE / COST / REMAINING. Road $100 per 40 units, light $500, lane $700, junction
+  change $1000, delete free (`BUILD_COSTS` in `balanceConfig.ts`). Unspent money gives bonus points.
+* **Objectives** per level: PASS_CARS, PASS_CARS_WITHOUT_CRASH, MAX_WAIT_TIME, MAX_QUEUE_LENGTH,
+  BUDGET_LIMIT, BUILD_LIMIT, EMERGENCY_PRIORITY, TIME_LIMIT — shown live and on the result screen.
+* **Inspector**: road (length, lanes, direction, load, average speed, vehicles/min), light (state,
+  incoming, queue), junction (vehicles/min, average delay, most used movement, conflict points).
+* **Debug overlay**: pause → DEBUG (or F3): FPS, counts, active conflict zones, queues, wait, density,
+  mode, budget, route compile time; switches for zones, paths, nodes, lanes, arrows, entries, exits.
+
+| # | Name | Decision |
+| --- | --- | --- |
+| 1 | Simple Crossing | add lights to a priority crossing |
+| 2 | Three Ways | choose the main road of a Y junction |
+| 3 | Missing Link | build the road that connects drivers to their exit |
+| 4 | T-Junction | signal a T junction |
+| 5 | Tight Budget | only three of four lights are affordable |
+| 6 | Twin Junctions | signal only the side streets |
+| 7 | Wrong Way | reverse a one-way street |
+| 8 | Lanes | widen the approach |
+| 9 | Siren Street | clear the way for emergency vehicles |
+| 10 | City Grid | lights in the right places of a 4-junction grid |
+
+Every campaign level is checked by the tests: doing nothing fails (or cannot even start) and the
+reference solution wins within budget, without crashes, with all objectives complete.
+
 ## Level editor
 
-Menu → **Editor**. Tap the map to lay horizontal or vertical roads (up to 3 each way), switch a road
-between 1 and 2 lanes per direction, or erase it. **Traffic** sets vehicles per entry, density, buses,
-trucks, emergency vehicles, slip lanes and a time limit. Junctions, signals, routes (straight, left and
-right turns) and flows are generated automatically.
+Menu → **CREATE** (or LEVELS → MY LEVELS). The editor uses the same road tools plus ENTRY, EXIT and
+DECOR, with an unlimited budget. Top bar: **NEW / LOAD / SAVE / COPY / DELETE / RULES** and
+**TEST LEVEL**; tap the name to rename. The inspector edits an entry's vehicle count, rate, types and
+emergency vehicles. **RULES** sets the player's budget, time limit, maximum wait and allowed tools.
 
-* **Test** plays the level; **Check** lets the autopilot try it and reports whether it is solvable.
-* **Share** shows a `TF1:…` code to copy; paste someone else's code there and press **Load**.
-* Three save slots, stored in the browser.
+* Every change autosaves; levels are stored in `localStorage` (`traffic-flow.custom-levels`) as
+  `{ id, name, createdAt, updatedAt, schemaVersion: 2, map: { world, seed, network }, rules, budget }`.
+* **TEST LEVEL** validates the level first (entries, exits, routes, connected roads, lights on real
+  approaches, geometry) and reports the first problem. After the test: **EDIT / RESTART / BACK**.
+* **LOAD** lists your levels and has **Share** (`TF2-…` codes). Levels from the old grid editor are
+  converted automatically on first start.
 
 ## Records
 
@@ -117,11 +159,21 @@ src/
     LevelManager.ts          level order, unlocks, shared stores
     AudioManager.ts          procedural Web Audio sound effects (incl. siren)
     AutoPilot.ts             adaptive signal controller (menu demo, editor check, solvability tests)
-  editor/                    EditorModel (roads → level, share codes), EditorStore (save slots)
-  levels/                    builder (lanes, slip lanes, lights), level00–09, registry
-  render/                    WorldRenderer, CameraController (zoom/pan/rotation), procedural textures
-  scenes/                    Boot, Menu, LevelSelect, Game, Result, Records, Editor
-  ui/                        Button, LevelCard, HUD, Modal, TutorialOverlay, DOM text dialog, UI helpers
+    ObjectiveTracker.ts      level objectives (live status, pass / fail)
+  graph/                     RoadNetwork (nodes/edges/lanes, auto junctions), PathFinder (A*, cached),
+                             NetworkCompiler (network → routes, lanes, turns, lights, right of way), geometry
+  building/                  BuildManager (tools as commands), RoadBuilder (snapping, polylines),
+                             BuildValidator (geometry), BudgetSystem
+  history/                   CommandHistory (undo / redo with snapshots)
+  analytics/                 TrafficAnalytics (queues, waits, density, speed, utilization, per road/junction/light)
+  editor/                    CustomLevelStore (custom levels, migration, TF2 codes), LevelValidator,
+                             EditorModel / EditorStore (old grid editor, kept for migration)
+  levels/                    builder, classic level00–09, campaign/ (Campaign 2.0, ids 101–110), registry
+  render/                    WorldRenderer, NetworkPainter, NetworkOverlay (grid, preview, load, debug),
+                             CameraController (zoom/pan/rotation), procedural textures
+  scenes/                    Boot, Menu, LevelSelect, Game, Result, Records, Editor; build/BuildController
+  ui/                        Button, LevelCard, HUD, Modal, BuildToolbar, InspectorPanel, ObjectivesPanel,
+                             DebugPanel, TutorialOverlay, DOM text dialog, UI helpers
   utils/                     math (seeded RNG), geometry (vectors, Bézier, OBB), wall-clock frame timer
 scripts/generate-icons.mjs   procedural PNG icon generator
 tests/                       Vitest suites
@@ -141,3 +193,11 @@ Key design points:
   danger indicator and the auto-pilot. Crashes are detected physically with oriented rectangles.
 * **Mobile.** Resizable canvas, two cameras (zoomed world + 1:1 UI), wide maps rotate 90° on tall screens,
   pinch/drag with tap-vs-drag disambiguation, large nearest-light touch targets, no keyboard needed.
+* **Road networks (schema 2).** A level may carry a `network` (nodes, edges with lanes per direction,
+  lights per junction approach, entries, exits). `NetworkCompiler` turns it into the same routes / lights
+  / flows the simulation always used, so classic levels (schema 1) run unchanged. After every build the
+  level is recompiled once (never per frame; A* results are cached per graph version) and hot-swapped
+  into the running simulation: cars already driving keep their routes, lights keep their state.
+* **Right of way.** Unsignalled junctions have a main road (automatic or chosen); other movements give
+  way, accept a gap only when the whole junction path is clear, and never stop halfway across. Cars with
+  priority — and cars on green — still do not drive into a vehicle that is inside the junction.

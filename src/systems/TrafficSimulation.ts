@@ -2,7 +2,7 @@ import { DRIVING, SCORE, SIM } from '../config/balanceConfig';
 import { Vehicle } from '../entities/Vehicle';
 import { LightState, VehicleState, type GameOutcome, type LevelDef, type LevelResult } from '../types';
 import { CollisionSystem, type CrashInfo } from './CollisionSystem';
-import { buildRuntimeRoutes, hasYields, isYieldZone, type RouteStop, type RuntimeRoute } from './RouteNetwork';
+import { buildRuntimeRoutes, hasYields, isYieldZone, type RouteStop, type RouteZone, type RuntimeRoute } from './RouteNetwork';
 import { ObjectiveTracker, type BuildStats } from './ObjectiveTracker';
 import { ScoreSystem } from './ScoreSystem';
 import { TrafficLightSystem, type LightChange } from './TrafficLightSystem';
@@ -260,10 +260,21 @@ export class TrafficSimulation {
       const dy = o.y - v.y;
       if (dx * dx + dy * dy > range * range) continue;
       if (dx * cosV + dy * sinV < 0) continue; // behind us
-      if (Math.cos(o.angle - v.angle) < 0.35) continue; // crossing or opposing traffic
+      const align = Math.cos(o.angle - v.angle);
+      const diverging = o.route.spawnId === v.route.spawnId && align > -0.2;
+      if (align < 0.35 && !diverging) continue; // crossing or opposing traffic
       const proj = path.closestInRange(o, v.s, v.s + range);
-      if (proj.distSq > tol2 || proj.s <= v.s) continue;
-      const gap = proj.s - v.s - (v.length + o.length) / 2;
+      let gap = proj.s - v.s - (v.length + o.length) / 2;
+      if (proj.distSq > tol2 || proj.s <= v.s) {
+        // Routes from the same entry split: the car ahead may already have turned off our
+        // line while its rear still blocks it.
+        if (!diverging) continue;
+        const rear = { x: o.x - Math.cos(o.angle) * o.length * 0.5, y: o.y - Math.sin(o.angle) * o.length * 0.5 };
+        const pr = path.closestInRange(rear, v.s, v.s + range);
+        const clear = (v.width + o.width) / 2 + 1.5;
+        if (pr.distSq > clear * clear || pr.s <= v.s) continue;
+        gap = pr.s - v.s - v.length / 2;
+      }
       if (gap < bestGap) {
         bestGap = gap;
         bestSpeed = o.crashed ? 0 : o.speed;
@@ -318,11 +329,14 @@ export class TrafficSimulation {
       const dist = rz.sEnter - v.front;
       if (dist > 60) break;
       if (dist < 1 || isYieldZone(v.route, rz)) continue;
-      if (v.route.stops.some((st) => rz.sEnter > st.s - 4 && rz.sEnter < st.s + ZONE_SCAN_AFTER_STOP)) continue;
+      // Signal-controlled zone: conflicts between signalled streams are the player's job, but
+      // an unsignalled car (giving way at a partly signalled junction) inside it is still avoided.
+      const signalled = v.route.stops.some((st) => rz.sEnter > st.s - 4 && rz.sEnter < st.s + ZONE_SCAN_AFTER_STOP);
       for (const o of this.vehicles) {
         if (o === v || !this.collisions.routesConflict(rz.zone, v.route.id, o.route.id)) continue;
         const orz = o.route.zones.find((z) => z.zone === rz.zone);
         if (!orz || o.rear > orz.sExit) continue;
+        if (signalled && !isYieldZone(o.route, orz)) continue;
         const inside = rz.zone.vehicles.has(o.id);
         if (!inside && !o.committedZones.has(rz.zone.id)) continue;
         if (v.requiredDecel(dist - DRIVING.stopLineGap - 2) > v.emergencyBrake) return null;
@@ -391,18 +405,32 @@ export class TrafficSimulation {
         continue;
       }
       if (dist > STOP_SCAN) return null;
-      const clear = this.collisions.isZoneClear(v, rz, this.vehicles, DRIVING.yieldHorizon, true);
+      // Give way at a junction: accept the gap only when every conflict zone of the junction on
+      // our path is clear, then commit to all of them — never stop halfway across.
+      const group = this.junctionZones(v, rz);
+      const clear = group.every(
+        (g) => v.committedZones.has(g.zone.id) || this.collisions.isZoneClear(v, g, this.vehicles, DRIVING.yieldHorizon, true),
+      );
       if (clear) {
-        if (dist < DRIVING.yieldCommit) v.committedZones.add(rz.zone.id);
+        if (dist < DRIVING.yieldCommit) for (const g of group) v.committedZones.add(g.zone.id);
         continue;
       }
       if (v.requiredDecel(dist - DRIVING.stopLineGap - 2) > v.emergencyBrake) {
-        v.committedZones.add(rz.zone.id); // too late to stop
+        for (const g of group) v.committedZones.add(g.zone.id); // too late to stop
         continue;
       }
       return rz.sEnter - 2;
     }
     return null;
+  }
+
+  /** Yield zones of the same junction as `rz` (slip lanes: just `rz`). */
+  private junctionZones(v: Vehicle, rz: RouteZone): RouteZone[] {
+    const ys = v.route.def.yields;
+    if (!ys || v.route.def.free) return [rz];
+    const circle = ys.find((y) => Math.hypot(rz.zone.x - y.x, rz.zone.y - y.y) < y.r);
+    if (!circle) return [rz];
+    return v.route.zones.filter((z) => z.sEnter >= rz.sEnter && Math.hypot(z.zone.x - circle.x, z.zone.y - circle.y) < circle.r);
   }
 
   private zonesClearAfter(v: Vehicle, stop: RouteStop, horizon?: number): boolean {
