@@ -108,13 +108,15 @@ export class MenuScene extends Phaser.Scene {
     this.tweens.add({ targets: title, scale: { from: 0.94, to: 1 }, duration: 600, ease: 'Back.Out' });
 
     const lm = levelManager();
-    const target = lm.playTarget();
+    // New players start with the tutorial, then the road-building campaign.
+    const tutorial = lm.playTarget() === 0;
+    const target = tutorial ? 0 : lm.campaignTarget();
     const bw = Math.min(W - 40, 340 * s);
     const bh = Math.max(46, (compact ? 48 : 56) * s);
     const gap = 12 * s;
     let y = titleY + (compact ? 70 : 96) * s;
     const play = new Button(this, W / 2, y + bh / 2, {
-      label: target === 0 ? t('menu.playTutorial') : t('menu.play', { n: target }),
+      label: target === 0 ? t('menu.playTutorial') : t('menu.play', { n: target - 100 }),
       icon: 'play',
       width: bw,
       height: bh,
@@ -128,8 +130,8 @@ export class MenuScene extends Phaser.Scene {
     const half = (bw - gap) / 2;
     const grid: { label: string; icon: 'grid' | 'trophy' | 'edit' | 'gear'; go: () => void }[] = [
       { label: t('menu.levels'), icon: 'grid', go: () => goTo(this, 'LevelSelect') },
+      { label: t('menu.create'), icon: 'edit', go: () => goTo(this, 'Editor') },
       { label: t('menu.records'), icon: 'trophy', go: () => goTo(this, 'Records') },
-      { label: t('menu.editor'), icon: 'edit', go: () => goTo(this, 'Editor') },
       { label: t('menu.settings'), icon: 'gear', go: () => this.openSettings() },
     ];
     grid.forEach((b, i) => {

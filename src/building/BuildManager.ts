@@ -179,7 +179,7 @@ export class ChangeIntersectionCommand extends BuildCommand {
 
 export class SetEndpointCommand extends BuildCommand {
   readonly name = 'SetEndpoint';
-  /** Cycles a road end: nothing → spawn → exit → nothing (only the given kind when set). */
+  /** Toggles an entry or an exit on a road end (a two-way road end can be both). */
   constructor(
     private readonly node: string,
     private readonly kind: 'spawn' | 'exit',
@@ -190,15 +190,8 @@ export class SetEndpointCommand extends BuildCommand {
     if (m.net.degree(this.node) !== 1) return this.refuse('build.endpointOnly');
     if (this.kind === 'spawn') {
       if (m.net.spawnAt(this.node)) m.net.setSpawn(this.node, null);
-      else {
-        m.net.setExit(this.node, false);
-        m.net.setSpawn(this.node, { count: 8, startDelay: 1, interval: [2.2, 3.4] });
-      }
-    } else if (m.net.exitAt(this.node)) m.net.setExit(this.node, false);
-    else {
-      m.net.setSpawn(this.node, null);
-      m.net.setExit(this.node, true);
-    }
+      else m.net.setSpawn(this.node, { count: 8, startDelay: 1, interval: [2.2, 3.4] });
+    } else m.net.setExit(this.node, !m.net.exitAt(this.node));
     return this.done(m, 0);
   }
 }

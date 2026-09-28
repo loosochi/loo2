@@ -1,17 +1,26 @@
 import Phaser from 'phaser';
 import { COLORS } from '../config/theme';
 import { t } from '../i18n';
+import { customToLevel } from '../editor/CustomLevelStore';
 import { levelManager } from '../systems/LevelManager';
+import type { LevelDef } from '../types';
 import { Button } from '../ui/Button';
 import { LevelCard } from '../ui/LevelCard';
 import { drawStar, enterScene, goTo, makeText, uiScale } from '../ui/uiKit';
 
-/** Grid of level cards with stars, best score and locked state. */
+export type LevelTab = 'campaign' | 'classic' | 'custom';
+
+/** Tabs (campaign / classic / my levels) with a grid of level cards or the custom level list. */
 export class LevelSelectScene extends Phaser.Scene {
   private root!: Phaser.GameObjects.Container;
+  private tab: LevelTab = 'campaign';
 
   constructor() {
     super('LevelSelect');
+  }
+
+  init(data: { tab?: LevelTab }): void {
+    if (data?.tab) this.tab = data.tab;
   }
 
   create(): void {
@@ -60,8 +69,36 @@ export class LevelSelectScene extends Phaser.Scene {
     }
     this.root.add([back, title, starG, starTxt]);
 
-    const header = title.y + 34 * s;
-    const n = lm.levels.length;
+    // Tabs.
+    const tabs: { id: LevelTab; label: string }[] = [
+      { id: 'campaign', label: t('levels.campaign') },
+      { id: 'classic', label: t('levels.classic') },
+      { id: 'custom', label: t('levels.custom') },
+    ];
+    const tabW = Math.min(180 * s, (W - pad * 2 - 16) / 3);
+    const tabY = title.y + 30 * s + btn / 2;
+    tabs.forEach((tb, i) => {
+      this.root.add(
+        new Button(this, W / 2 + (i - 1) * (tabW + 8), tabY, {
+          label: tb.label,
+          width: tabW,
+          height: btn,
+          style: this.tab === tb.id ? 'primary' : 'secondary',
+          fontSize: 13 * s,
+          onClick: () => {
+            this.tab = tb.id;
+            this.build();
+          },
+        }),
+      );
+    });
+    const header = tabY + btn / 2 + 16 * s;
+    if (this.tab === 'custom') {
+      this.buildCustom(header, pad);
+      return;
+    }
+    const levels: readonly LevelDef[] = this.tab === 'campaign' ? lm.campaign : lm.levels;
+    const n = levels.length;
     const cols = W < 560 ? 2 : W < 900 && H > W ? 3 : 5;
     const rows = Math.ceil(n / cols);
     const gap = 14 * s;
@@ -71,7 +108,7 @@ export class LevelSelectScene extends Phaser.Scene {
     const gridH = rows * cardH + (rows - 1) * gap;
     const startY = header + Math.max(0, (availH - gridH) / 2);
 
-    lm.levels.forEach((level, i) => {
+    levels.forEach((level, i) => {
       const row = Math.floor(i / cols);
       const inRow = Math.min(cols, n - row * cols);
       const rowW = inRow * cardW + (inRow - 1) * gap;
@@ -93,5 +130,67 @@ export class LevelSelectScene extends Phaser.Scene {
       this.tweens.add({ targets: card, alpha: card.input ? 1 : 0.75, y: y, duration: 260, delay: 40 * i, ease: 'Quad.Out' });
       this.root.add(card);
     });
+  }
+
+  /** My levels: name, date, PLAY and EDIT. */
+  private buildCustom(top: number, pad: number): void {
+    const { width: W, height: H } = this.scale;
+    const s = uiScale(this);
+    const lm = levelManager();
+    const list = lm.custom.list();
+    const bh = Math.max(44, 48 * s);
+    const rowW = Math.min(W - pad * 2, 640 * s);
+    const x0 = (W - rowW) / 2;
+    const create = new Button(this, W / 2, top + bh / 2, {
+      label: t('menu.create'),
+      icon: 'plus',
+      width: Math.min(rowW, 260 * s),
+      height: bh,
+      style: 'primary',
+      onClick: () => goTo(this, 'Editor', { fresh: true }),
+    });
+    this.root.add(create);
+    let y = top + bh + 14 * s;
+    if (!list.length) {
+      this.root.add(makeText(this, W / 2, y + 30 * s, t('levels.noCustom'), { size: 15 * s, color: COLORS.textDim, align: 'center', wrap: rowW }).setOrigin(0.5));
+      return;
+    }
+    const rowH = bh + 12 * s;
+    const fit = Math.max(1, Math.floor((H - y - pad) / rowH));
+    for (const c of list.slice(0, fit)) {
+      const g = this.add.graphics();
+      g.fillStyle(COLORS.panelLight, 1);
+      g.fillRoundedRect(x0, y, rowW, rowH - 6 * s, 12);
+      this.root.add(g);
+      const mid = y + (rowH - 6 * s) / 2;
+      const small = rowW < 460;
+      const bw = small ? bh : 110 * s;
+      const name = makeText(this, x0 + 14 * s, mid - 9 * s, c.name, { size: 15 * s, bold: true }).setOrigin(0, 0.5);
+      while (name.width > rowW - bw * 2 - 50 * s && parseFloat(String(name.style.fontSize)) > 9) name.setFontSize(parseFloat(String(name.style.fontSize)) - 1);
+      const date = new Date(c.updatedAt).toLocaleDateString();
+      this.root.add([
+        name,
+        makeText(this, x0 + 14 * s, mid + 11 * s, t('ed2.updated', { date }), { size: 11 * s, color: COLORS.textDim }).setOrigin(0, 0.5),
+        new Button(this, x0 + rowW - 8 * s - bw / 2, mid, {
+          label: small ? undefined : t('common.start'),
+          icon: 'play',
+          width: bw,
+          height: bh - 4,
+          style: 'primary',
+          fontSize: 12 * s,
+          onClick: () => goTo(this, 'Game', { custom: customToLevel(c), customId: c.id }),
+        }),
+        new Button(this, x0 + rowW - 16 * s - bw * 1.5, mid, {
+          label: small ? undefined : t('result.edit'),
+          icon: 'edit',
+          width: bw,
+          height: bh - 4,
+          style: 'secondary',
+          fontSize: 12 * s,
+          onClick: () => goTo(this, 'Editor', { customId: c.id }),
+        }),
+      ]);
+      y += rowH;
+    }
   }
 }

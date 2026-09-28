@@ -1,5 +1,6 @@
 import { CAMPAIGN2, FIRST_CAMPAIGN_ID, LAST_CAMPAIGN_ID, LAST_LEVEL_ID, LEVELS, getLevel } from '../levels/levelRegistry';
 import type { LevelDef } from '../types';
+import { CustomLevelStore } from '../editor/CustomLevelStore';
 import { EditorStore } from '../editor/EditorStore';
 import { Leaderboard } from './Leaderboard';
 import { SaveManager, detectStore } from './SaveManager';
@@ -9,12 +10,14 @@ export class LevelManager {
   readonly save: SaveManager;
   readonly records: Leaderboard;
   readonly editor: EditorStore;
+  readonly custom: CustomLevelStore;
 
   constructor(save?: SaveManager, records?: Leaderboard) {
     const store = detectStore();
     this.save = save ?? new SaveManager(LAST_LEVEL_ID, store, { first: FIRST_CAMPAIGN_ID, last: LAST_CAMPAIGN_ID });
     this.records = records ?? new Leaderboard(store);
     this.editor = new EditorStore(store);
+    this.custom = new CustomLevelStore(store);
   }
 
   /** Classic levels (tutorial + 9 light-only levels). */

@@ -58,7 +58,9 @@ export class InspectorPanel {
     const rowH = 22 * s;
     const actH = Math.max(44, 44 * s);
     const actions = c.actions ?? [];
-    const actRows = side ? actions.length : Math.ceil(actions.length / 2);
+    // Side panel: one column for a few actions, two when there are many.
+    const cols = side && actions.length <= 3 ? 1 : 2;
+    const actRows = Math.ceil(actions.length / cols);
     const ph = 46 * s + c.rows.length * rowH + (actions.length ? actRows * (actH + 8) + 6 : 0) + 10 * s;
     const px = side ? W - pw - 10 : 8;
     const py = side ? area.top + 10 : area.bottom - ph - 8;
@@ -84,10 +86,10 @@ export class InspectorPanel {
       y += rowH;
     }
     y += 6;
-    const aw = side ? pw - 24 : (pw - 32) / 2;
+    const aw = cols === 1 ? pw - 24 : (pw - 32) / 2;
     actions.forEach((a, i) => {
-      const col = side ? 0 : i % 2;
-      const row = side ? i : Math.floor(i / 2);
+      const col = i % cols;
+      const row = Math.floor(i / cols);
       const x = px + 12 + aw / 2 + col * (aw + 8);
       this.root.add(
         new Button(scene, x, y + row * (actH + 8) + actH / 2, {

@@ -34,7 +34,7 @@ export class LevelCard extends Phaser.GameObjects.Container {
 
     const s = Math.min(w, h * 1.1);
     const numSize = s * 0.3;
-    const num = makeText(scene, 0, -h * 0.22, o.level.id === 0 ? t('levels.tutorial') : String(o.level.id), {
+    const num = makeText(scene, 0, -h * 0.22, o.level.id === 0 ? t('levels.tutorial') : String(o.level.id > 100 ? o.level.id - 100 : o.level.id), {
       size: o.level.id === 0 ? numSize * 0.36 : numSize,
       bold: true,
       color: o.unlocked ? COLORS.text : COLORS.textDim,
