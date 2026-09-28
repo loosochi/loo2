@@ -42,6 +42,7 @@ export const EMERGENCY_COLORS = { ambulance: 0xf8f9fa, police: 0x1d3557, fire: 0
 
 /** Colour palette per vehicle kind. */
 export function paletteFor(kind: VehicleKind): readonly number[] {
+  if (kind === 'taxi') return [0xffc300];
   if (kind === 'bus') return BUS_COLORS;
   if (kind === 'truck') return TRUCK_COLORS;
   if (kind === 'ambulance' || kind === 'police' || kind === 'fire') return [EMERGENCY_COLORS[kind]];

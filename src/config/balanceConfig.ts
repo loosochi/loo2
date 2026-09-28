@@ -43,6 +43,8 @@ export const VEHICLE_SPECS: VehicleSpec[] = [
   { kind: 'sedan', length: 24, width: 13, maxSpeed: [76, 86], accel: 46, brake: 76, weight: 4, points: 100 },
   { kind: 'hatch', length: 21, width: 12.5, maxSpeed: [70, 78], accel: 50, brake: 80, weight: 3, points: 100 },
   { kind: 'sport', length: 23, width: 12.5, maxSpeed: [86, 96], accel: 62, brake: 90, weight: 1, points: 100 },
+  // Taxi: an ordinary car with its own livery (only where a level mixes taxis in).
+  { kind: 'taxi', length: 23, width: 13, maxSpeed: [76, 86], accel: 48, brake: 78, weight: 0, points: 120 },
   // Heavy vehicles: long, slow to accelerate — they clog junctions if you are careless.
   { kind: 'bus', length: 46, width: 15, maxSpeed: [60, 66], accel: 26, brake: 60, weight: 0, points: 250, heavy: true },
   { kind: 'truck', length: 40, width: 15, maxSpeed: [62, 70], accel: 28, brake: 58, weight: 0, points: 150, heavy: true },

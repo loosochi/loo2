@@ -85,6 +85,7 @@ function drawVehicle(g: Phaser.GameObjects.Graphics, kind: VehicleKind, L: numbe
       return drawFireEngine(g, L, W, color);
     case 'ambulance':
     case 'police':
+    case 'taxi':
       return drawCar(g, 'sedan', L, W, color, kind);
     default:
       return drawCar(g, kind, L, W, color);
@@ -158,7 +159,7 @@ function drawFireEngine(g: Phaser.GameObjects.Graphics, L: number, W: number, co
 }
 
 /** Top-down car, nose pointing to +x. Ambulance and police variants get their livery. */
-function drawCar(g: Phaser.GameObjects.Graphics, kind: VehicleKind, L: number, W: number, color: number, livery?: 'ambulance' | 'police'): void {
+function drawCar(g: Phaser.GameObjects.Graphics, kind: VehicleKind, L: number, W: number, color: number, livery?: 'ambulance' | 'police' | 'taxi'): void {
   const x = 1;
   const y = 1;
   const dark = shade(color, -0.35);
@@ -198,6 +199,19 @@ function drawCar(g: Phaser.GameObjects.Graphics, kind: VehicleKind, L: number, W
     g.fillRect(x + 3, y + W - 1.5 - W * 0.12, L * 0.3, W * 0.12);
     g.fillRect(x + L * 0.08, y + W / 2 - W * 0.07, L * 0.18, W * 0.14);
     g.fillRect(x + L * 0.17 - W * 0.07, y + W / 2 - L * 0.09, W * 0.14, L * 0.18);
+  }
+  if (livery === 'taxi') {
+    // Checker stripe along both sides and a roof sign.
+    for (let i = 0; i < 6; i++) {
+      g.fillStyle(i % 2 ? 0x111111 : 0xffffff, 1);
+      g.fillRect(x + L * 0.18 + i * L * 0.07, y + 1.5, L * 0.07, W * 0.1);
+      g.fillStyle(i % 2 ? 0xffffff : 0x111111, 1);
+      g.fillRect(x + L * 0.18 + i * L * 0.07, y + W - 1.5 - W * 0.1, L * 0.07, W * 0.1);
+    }
+    g.fillStyle(0x222222, 1);
+    g.fillRoundedRect(x + L * 0.46, y + W * 0.32, L * 0.1, W * 0.36, 2);
+    g.fillStyle(0xfff3b0, 1);
+    g.fillRoundedRect(x + L * 0.475, y + W * 0.36, L * 0.07, W * 0.28, 1.5);
   }
   if (livery === 'police') {
     g.fillStyle(0xffffff, 1);

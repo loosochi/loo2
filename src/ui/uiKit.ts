@@ -85,7 +85,22 @@ export type IconName =
   | 'plus'
   | 'minus'
   | 'trash'
-  | 'car';
+  | 'car'
+  | 'trafficlight'
+  | 'road'
+  | 'search'
+  | 'tree'
+  | 'undo'
+  | 'redo'
+  | 'magnet'
+  | 'swap'
+  | 'junction'
+  | 'chart'
+  | 'hammer'
+  | 'bug'
+  | 'lanes'
+  | 'entry'
+  | 'exitflag';
 
 /** Simple vector icons drawn with Graphics, centred at (0, 0) within a box of size `s`. */
 export function drawIcon(g: Phaser.GameObjects.Graphics, name: IconName, s: number, color: number): void {
@@ -237,6 +252,82 @@ export function drawIcon(g: Phaser.GameObjects.Graphics, name: IconName, s: numb
       g.fillRect(-h * 0.55, -h * 0.55, h * 1.1, h * 0.16);
       g.fillRect(-h * 0.15, -h * 0.7, h * 0.3, h * 0.16);
       g.fillRoundedRect(-h * 0.42, -h * 0.35, h * 0.84, h * 1.0, 2);
+      break;
+    case 'trafficlight':
+      g.fillRoundedRect(-h * 0.32, -h * 0.8, h * 0.64, h * 1.6, h * 0.2);
+      g.fillStyle(COLORS.panel, 1);
+      for (const k of [-0.45, 0, 0.45]) g.fillCircle(0, k * h, h * 0.16);
+      break;
+    case 'road':
+      g.fillRect(-h * 0.7, -h * 0.5, h * 0.18, h * 1.0);
+      g.fillRect(h * 0.52, -h * 0.5, h * 0.18, h * 1.0);
+      for (const k of [-0.45, 0.05]) g.fillRect(-h * 0.07, k * h, h * 0.14, h * 0.35);
+      break;
+    case 'search':
+      g.lineStyle(Math.max(2, s * 0.12), color, 1);
+      g.strokeCircle(-h * 0.12, -h * 0.12, h * 0.42);
+      g.lineBetween(h * 0.18, h * 0.18, h * 0.62, h * 0.62);
+      break;
+    case 'tree':
+      g.fillCircle(0, -h * 0.2, h * 0.5);
+      g.fillRect(-h * 0.1, h * 0.2, h * 0.2, h * 0.55);
+      break;
+    case 'undo':
+    case 'redo': {
+      const sx = name === 'undo' ? 1 : -1;
+      g.beginPath();
+      g.arc(0, h * 0.1, h * 0.5, Math.PI * (name === 'undo' ? 1.1 : -0.1), Math.PI * (name === 'undo' ? 2.1 : 0.9), name !== 'undo');
+      g.strokePath();
+      g.fillTriangle(-sx * h * 0.75, -h * 0.35, -sx * h * 0.2, -h * 0.05, -sx * h * 0.72, h * 0.25);
+      break;
+    }
+    case 'magnet':
+      g.beginPath();
+      g.arc(0, -h * 0.05, h * 0.45, Math.PI, 0, false);
+      g.strokePath();
+      g.fillRect(-h * 0.58, -h * 0.05, h * 0.26, h * 0.6);
+      g.fillRect(h * 0.32, -h * 0.05, h * 0.26, h * 0.6);
+      break;
+    case 'swap':
+      g.fillTriangle(h * 0.7, -h * 0.35, h * 0.3, -h * 0.7, h * 0.3, 0);
+      g.fillRect(-h * 0.6, -h * 0.45, h * 0.95, h * 0.2);
+      g.fillTriangle(-h * 0.7, h * 0.35, -h * 0.3, h * 0.7, -h * 0.3, 0);
+      g.fillRect(-h * 0.35, h * 0.25, h * 0.95, h * 0.2);
+      break;
+    case 'junction':
+      g.fillRect(-h * 0.8, -h * 0.16, h * 1.6, h * 0.32);
+      g.fillRect(-h * 0.16, -h * 0.8, h * 0.32, h * 1.6);
+      g.fillStyle(COLORS.panel, 1);
+      g.fillCircle(0, 0, h * 0.1);
+      break;
+    case 'chart':
+      g.fillRect(-h * 0.65, h * 0.1, h * 0.3, h * 0.55);
+      g.fillRect(-h * 0.15, -h * 0.3, h * 0.3, h * 0.95);
+      g.fillRect(h * 0.35, -h * 0.65, h * 0.3, h * 1.3);
+      break;
+    case 'hammer':
+      g.fillRoundedRect(-h * 0.65, -h * 0.7, h * 0.9, h * 0.38, 2);
+      g.fillRect(-h * 0.3, -h * 0.35, h * 0.2, h * 1.05);
+      break;
+    case 'bug':
+      g.fillEllipse(0, h * 0.1, h * 0.8, h * 1.1);
+      g.lineStyle(Math.max(1.5, s * 0.08), color, 1);
+      for (const k of [-0.2, 0.15, 0.5]) {
+        g.lineBetween(-h * 0.7, k * h, h * 0.7, k * h);
+      }
+      g.fillCircle(0, -h * 0.55, h * 0.22);
+      break;
+    case 'lanes':
+      for (const k of [-0.6, 0, 0.6]) g.fillRect(k * h - h * 0.08, -h * 0.75, h * 0.16, h * 1.5);
+      g.fillTriangle(h * 0.3, -h * 0.2, h * 0.3, h * 0.2, h * 0.55, 0);
+      break;
+    case 'entry':
+      g.fillTriangle(-h * 0.2, -h * 0.6, -h * 0.2, h * 0.6, h * 0.6, 0);
+      g.fillRect(-h * 0.75, -h * 0.12, h * 0.6, h * 0.24);
+      break;
+    case 'exitflag':
+      g.fillRect(-h * 0.5, -h * 0.75, h * 0.14, h * 1.5);
+      g.fillTriangle(-h * 0.36, -h * 0.75, h * 0.6, -h * 0.45, -h * 0.36, -h * 0.15);
       break;
     case 'car':
       g.fillRoundedRect(-h * 0.7, -h * 0.35, h * 1.4, h * 0.7, h * 0.2);
