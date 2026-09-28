@@ -7,8 +7,10 @@ import type { Vehicle } from '../entities/Vehicle';
 import { isYieldZone, type RuntimeRoute } from '../systems/RouteNetwork';
 import type { TrafficSimulation } from '../systems/TrafficSimulation';
 import { LightState, type Dir, type LightDef, type Vec2 } from '../types';
-import { dirVector } from '../utils/geometry';
+import { dirAngle, dirVector } from '../utils/geometry';
 import { wrapAngle } from '../utils/math';
+import { RoadNetwork } from '../graph/RoadNetwork';
+import { paintNetworkMarkings, paintNetworkRoads } from './NetworkPainter';
 import { CAR_BLINK, CAR_BRAKE, CAR_SHADOW, SOFT_DOT, TEX_SCALE, carKey } from './textures';
 
 const DEPTH = { ground: 0, road: 1, marks: 2, markers: 3, zones: 4, shadow: 5, car: 6, carFx: 7, decor: 8, light: 9, fx: 10 };
@@ -165,6 +167,8 @@ export class WorldRenderer {
       road.fillRect(q.x, q.y, q.w, q.h);
     }
     for (const pts of slips) strokePath(road, pts, ROAD.laneWidth - 2, COLORS.asphalt);
+    const net = lvl.network ? new RoadNetwork(lvl.network) : null;
+    if (net) paintNetworkRoads(road, net, lvl.world);
 
     // Lane markings (suppressed inside intersections).
     for (const r of roads) this.drawRoadMarkings(m, r, boxes);
@@ -174,9 +178,10 @@ export class WorldRenderer {
       m.fillRect(q.x, q.y, q.w, q.h);
       this.drawCrosswalks(m, b);
     }
-    for (const l of lvl.lights) this.drawStopLine(m, l.stop, l.dir, l.width);
+    if (net) paintNetworkMarkings(m, net, lvl.world);
+    for (const l of lvl.lights) this.drawStopLine(m, l.stop, l.angle ?? dirAngle(l.dir), l.width);
     for (const r of this.sim.routes) if (r.def.free) this.drawYield(m, r);
-    this.drawEndpoints(m);
+    if (!net) this.drawEndpoints(m);
 
     // Bake everything static into one texture: one quad per frame instead of thousands of shapes.
     const bw = W + M * 2;
@@ -320,12 +325,12 @@ export class WorldRenderer {
     }
   }
 
-  private drawStopLine(g: Phaser.GameObjects.Graphics, p: { x: number; y: number }, dir: Dir, width: number): void {
-    const v = dirVector(dir);
-    g.fillStyle(COLORS.stopLine, 0.95);
-    const t = 3;
-    if (v.x !== 0) g.fillRect(p.x - t / 2, p.y - width / 2 + 1, t, width - 2);
-    else g.fillRect(p.x - width / 2 + 1, p.y - t / 2, width - 2, t);
+  private drawStopLine(g: Phaser.GameObjects.Graphics, p: { x: number; y: number }, angle: number, width: number): void {
+    const u = { x: Math.cos(angle), y: Math.sin(angle) };
+    const n = { x: -u.y, y: u.x };
+    const h = width / 2 - 1;
+    g.lineStyle(3, COLORS.stopLine, 0.95);
+    g.lineBetween(p.x + n.x * h, p.y + n.y * h, p.x - n.x * h, p.y - n.y * h);
   }
 
   /** Arrow markers where traffic enters (cyan) and leaves (white) the map. */
@@ -359,10 +364,10 @@ export class WorldRenderer {
   private createLights(): void {
     for (const l of this.sim.lights.lights) {
       const def = l.def;
-      const vertical = def.dir === 'E' || def.dir === 'W';
       const bar = this.track(
         this.scene.add
-          .rectangle(def.stop.x, def.stop.y, vertical ? 5 : def.width - 4, vertical ? def.width - 4 : 5, COLORS.lightRed, 0.9)
+          .rectangle(def.stop.x, def.stop.y, 5, def.width - 4, COLORS.lightRed, 0.9)
+          .setRotation(def.angle ?? dirAngle(def.dir))
           .setDepth(DEPTH.marks),
       );
       const container = this.scene.add.container(def.head.x, def.head.y).setDepth(DEPTH.light);

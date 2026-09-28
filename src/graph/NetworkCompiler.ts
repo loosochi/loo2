@@ -74,6 +74,8 @@ export interface CompiledNetwork {
   specials: SpecialDef[];
   /** Spawn ids with no possible route to any exit. */
   unreachableSpawns: string[];
+  /** Required destinations (spawn.to) that cannot be reached. */
+  unreachablePairs: { spawn: string; exit: string }[];
   pathfindingMs: number;
 }
 
@@ -182,6 +184,7 @@ export function compileNetwork(net: RoadNetwork, world: { width: number; height:
   const routes: RouteDef[] = [];
   const flows: FlowDef[] = [];
   const unreachable: string[] = [];
+  const missingPairs: { spawn: string; exit: string }[] = [];
   const routeFor = new Map<string, string>();
 
   for (const sp of d.spawns) {
@@ -190,7 +193,10 @@ export function compileNetwork(net: RoadNetwork, world: { width: number; height:
     const seen = new Set<string>();
     for (const ex of targets) {
       const res = pf.find(sp.node, ex.node);
-      if (!res || res.traversals.length === 0) continue;
+      if (!res || res.traversals.length === 0) {
+        if (sp.to) missingPairs.push({ spawn: sp.id, exit: ex.id });
+        continue;
+      }
       const tr = res.traversals;
       const variants: RouteDef[] = [];
       for (let p = 0; p < tr[0].lanes; p++) {
@@ -206,12 +212,8 @@ export function compileNetwork(net: RoadNetwork, world: { width: number; height:
           if (signalled) continue;
           const nodeHasLights = d.lights.some((l) => l.node === N.id);
           const mp = mainPair(net, N);
-          const main =
-            !nodeHasLights &&
-            mp !== null &&
-            classifyTurn(tr[i], tr[i + 1]) === 'straight' &&
-            mp.includes(tr[i].edge.id) &&
-            mp.includes(tr[i + 1].edge.id);
+          // The main road (default: the straightest wide pair; chosen with the Intersection tool) never yields.
+          const main = !nodeHasLights && mp !== null && mp.includes(tr[i].edge.id) && mp.includes(tr[i + 1].edge.id);
           if (!main) yields.push({ x: N.x, y: N.y, r: nodeRadius(net, N) + 14 });
         }
         const id = `${sp.id}>${ex.id}#${p}`;
@@ -243,7 +245,7 @@ export function compileNetwork(net: RoadNetwork, world: { width: number; height:
     if (rid) specials.push({ at: s.at, spawnId: s.spawn, routeId: rid, kind: s.kind });
   }
   const t1 = typeof performance !== 'undefined' ? performance.now() : 0;
-  return { routes, lights, flows, specials, unreachableSpawns: unreachable, pathfindingMs: t1 - t0 };
+  return { routes, lights, flows, specials, unreachableSpawns: unreachable, unreachablePairs: missingPairs, pathfindingMs: t1 - t0 };
 }
 
 /** Deterministic trees and buildings placed away from every road. */

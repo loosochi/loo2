@@ -136,9 +136,13 @@ export class CollisionSystem {
   private arrivesSoon(v: Vehicle, rz: RouteZone, horizon: number): boolean {
     const d = rz.sEnter - v.front;
     if (d < 0) return v.rear <= rz.sExit;
-    if (v.stopTarget !== null && v.stopTarget <= rz.sEnter + 1) return false;
-    if (d < 6) return true;
-    return d / Math.max(v.speed, 0.5) < horizon;
+    // Committed to this zone (decided to go, maybe still standing): it is coming.
+    if (v.committedZones.has(rz.zone.id)) return true;
+    // A car stopped only to let crossing traffic clear (caution) will go again at once.
+    if (v.stopTarget !== null && v.stopTarget <= rz.sEnter + 1 && !v.cautious) return false;
+    if (d < 6 || (d < 14 && v.stopTarget === null)) return true;
+    // A queued car (not stopping for anything itself) may move off at any moment.
+    return d / Math.max(v.speed, v.stopTarget === null ? 8 : 0.5) < horizon;
   }
 
   /**
@@ -156,6 +160,8 @@ export class CollisionSystem {
       if (o === v || !this.routesConflict(rz.zone, v.route.id, o.route.id)) continue;
       const orz = o.route.zones.find((e) => e.zone === rz.zone);
       if (!orz) continue;
+      // Already inside the zone or committed to it: never clear.
+      if ((o.front >= orz.sEnter && o.rear <= orz.sExit) || o.committedZones.has(rz.zone.id)) return false;
       // Two cars both giving way: emergency vehicles first, then whoever entered the map first.
       if (asYielder && o.yielding && o.stopTarget !== null && o.stopTarget - o.front < 10) {
         const oFirst = (o.emergency && !v.emergency) || (o.emergency === v.emergency && o.id < v.id);

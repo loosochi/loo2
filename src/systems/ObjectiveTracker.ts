@@ -32,9 +32,10 @@ export class ObjectiveTracker {
     for (const v of sim.vehicles) {
       if (v.speed >= DRIVING.waitingSpeed || v.age < DRIVING.spawnTime) continue;
       const stop = v.route.stops[v.nextStop];
-      const key = stop && v.stopTarget === stop.s ? stop.light.id : v.stopTarget !== null ? `y:${v.route.id}:${Math.round(v.stopTarget / 20)}` : null;
-      // Cars queued behind a waiting car belong to the same queue: follow the lane.
-      const k = key ?? (stop ? stop.light.id : `r:${v.route.spawnId}`);
+      // One queue per lane: light (or give-way point / entry) + starting lane of the route.
+      const lane = v.route.id.split('#')[1] ?? '';
+      const at = stop ? stop.light.id : v.stopTarget !== null ? `y:${v.route.id}:${Math.round(v.stopTarget / 20)}` : `r:${v.route.spawnId}`;
+      const k = `${at}|${lane}`;
       counts.set(k, (counts.get(k) ?? 0) + 1);
     }
     return Math.max(0, ...counts.values());

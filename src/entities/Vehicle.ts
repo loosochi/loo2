@@ -50,6 +50,8 @@ export class Vehicle {
   readonly committed = new Set<number>();
   /** True while the car is waiting to give way at an unsignalled junction or slip lane. */
   yielding = false;
+  /** True while a car with right of way waits for crossing traffic to clear the junction. */
+  cautious = false;
   /** Conflict zones a yielding (free-turn) car has committed to enter. */
   readonly committedZones = new Set<string>();
 

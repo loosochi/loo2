@@ -11,6 +11,7 @@ export type ValidationKey =
   | 'val.noSpawn'
   | 'val.noExit'
   | 'val.spawnNoRoute'
+  | 'val.exitNoRoute'
   | 'val.spawnNotEnd'
   | 'val.exitNotEnd'
   | 'val.isolated'
@@ -54,6 +55,7 @@ export function validateNetwork(data: NetworkData, world: { width: number; heigh
   if (data.spawns.length && data.exits.length) {
     const c = compileNetwork(net, world);
     for (const id of c.unreachableSpawns) err('val.spawnNoRoute', id);
+    for (const p of c.unreachablePairs) if (!c.unreachableSpawns.includes(p.spawn)) err('val.exitNoRoute', `${p.spawn}>${p.exit}`);
     // Roads no vehicle can ever use.
     const used = new Set(c.routes.flatMap((r) => r.edges ?? []));
     for (const e of net.edges) if (!used.has(e.id)) warn('val.isolated', e.id);

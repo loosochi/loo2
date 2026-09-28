@@ -295,13 +295,41 @@ export class TrafficSimulation {
    */
   private resolveStop(v: Vehicle, leader: { gap: number } | null): number | null {
     const atSignal = this.resolveSignals(v, leader);
-    if (atSignal !== null || !hasYields(v.route)) {
+    if (atSignal !== null) {
       v.yielding = false;
+      v.cautious = false;
       return atSignal;
     }
-    const y = this.resolveYield(v);
+    const y = hasYields(v.route) ? this.resolveYield(v) : null;
     v.yielding = y !== null;
-    return y;
+    v.cautious = false;
+    if (y !== null) return y;
+    const c = v.route.def.nodes ? this.resolveCaution(v) : null;
+    v.cautious = c !== null;
+    return c;
+  }
+
+  /**
+   * Unsignalled junctions of road networks: even with right of way, a car does not drive into
+   * a conflict zone that crossing traffic is still inside.
+   */
+  private resolveCaution(v: Vehicle): number | null {
+    for (const rz of v.route.zones) {
+      const dist = rz.sEnter - v.front;
+      if (dist > 60) break;
+      if (dist < 1 || isYieldZone(v.route, rz)) continue;
+      if (v.route.stops.some((st) => rz.sEnter > st.s - 4 && rz.sEnter < st.s + ZONE_SCAN_AFTER_STOP)) continue;
+      for (const o of this.vehicles) {
+        if (o === v || !this.collisions.routesConflict(rz.zone, v.route.id, o.route.id)) continue;
+        const orz = o.route.zones.find((z) => z.zone === rz.zone);
+        if (!orz || o.rear > orz.sExit) continue;
+        const inside = rz.zone.vehicles.has(o.id);
+        if (!inside && !o.committedZones.has(rz.zone.id)) continue;
+        if (v.requiredDecel(dist - DRIVING.stopLineGap - 2) > v.emergencyBrake) return null;
+        return rz.sEnter - 2;
+      }
+    }
+    return null;
   }
 
   private resolveSignals(v: Vehicle, leader: { gap: number } | null): number | null {
