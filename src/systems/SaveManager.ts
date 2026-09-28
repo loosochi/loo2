@@ -1,3 +1,5 @@
+import type { Lang } from '../types';
+
 /** Persistent player profile stored in localStorage (with validation and safe fallbacks). */
 
 export interface LevelProgress {
@@ -13,6 +15,10 @@ export interface SaveData {
   levels: Record<string, LevelProgress>;
   sound: boolean;
   lastLevel: number;
+  /** Interface language; null = follow the browser. */
+  lang: Lang | null;
+  /** Name shown in the records table. */
+  playerName: string;
 }
 
 export const SAVE_KEY = 'traffic-flow.save';
@@ -39,7 +45,7 @@ export class MemoryStore implements KeyValueStore {
 }
 
 export function defaultSave(): SaveData {
-  return { version: SAVE_VERSION, unlocked: 1, levels: {}, sound: true, lastLevel: 1 };
+  return { version: SAVE_VERSION, unlocked: 1, levels: {}, sound: true, lastLevel: 0, lang: null, playerName: '' };
 }
 
 function isFiniteNumber(v: unknown): v is number {
@@ -47,22 +53,36 @@ function isFiniteNumber(v: unknown): v is number {
 }
 
 /** Validate untrusted data, keeping whatever is usable and defaulting the rest. */
-export function sanitizeSave(raw: unknown, levelCount: number): SaveData {
+/** Clean up a player name: printable, trimmed, at most 16 characters. */
+export function cleanName(name: string): string {
+  return name
+    .replace(/[\u0000-\u001f\u007f<>]/g, '')
+    .trim()
+    .slice(0, 16);
+}
+
+/**
+ * Validate untrusted data, keeping whatever is usable and defaulting the rest.
+ * `maxLevel` is the id of the last level (level 0 is the tutorial).
+ */
+export function sanitizeSave(raw: unknown, maxLevel: number): SaveData {
   const base = defaultSave();
   if (!raw || typeof raw !== 'object') return base;
   const r = raw as Record<string, unknown>;
-  const clampLevel = (n: number) => Math.max(1, Math.min(levelCount, Math.floor(n)));
+  const clampLevel = (n: number, min: number) => Math.max(min, Math.min(maxLevel, Math.floor(n)));
   const out: SaveData = {
     version: SAVE_VERSION,
-    unlocked: isFiniteNumber(r.unlocked) ? clampLevel(r.unlocked) : base.unlocked,
+    unlocked: isFiniteNumber(r.unlocked) ? clampLevel(r.unlocked, 1) : base.unlocked,
     levels: {},
     sound: typeof r.sound === 'boolean' ? r.sound : base.sound,
-    lastLevel: isFiniteNumber(r.lastLevel) ? clampLevel(r.lastLevel) : base.lastLevel,
+    lastLevel: isFiniteNumber(r.lastLevel) ? clampLevel(r.lastLevel, 0) : base.lastLevel,
+    lang: r.lang === 'en' || r.lang === 'ru' ? r.lang : null,
+    playerName: typeof r.playerName === 'string' ? cleanName(r.playerName) : '',
   };
   if (r.levels && typeof r.levels === 'object') {
     for (const [k, v] of Object.entries(r.levels as Record<string, unknown>)) {
       const id = Number(k);
-      if (!Number.isInteger(id) || id < 1 || id > levelCount || !v || typeof v !== 'object') continue;
+      if (!Number.isInteger(id) || id < 0 || id > maxLevel || !v || typeof v !== 'object') continue;
       const p = v as Record<string, unknown>;
       out.levels[k] = {
         bestScore: isFiniteNumber(p.bestScore) ? Math.max(0, Math.round(p.bestScore)) : 0,
@@ -75,7 +95,7 @@ export function sanitizeSave(raw: unknown, levelCount: number): SaveData {
   return out;
 }
 
-function detectStore(): KeyValueStore {
+export function detectStore(): KeyValueStore {
   try {
     const ls = globalThis.localStorage;
     if (ls) {
@@ -96,7 +116,7 @@ export class SaveManager {
   recovered = false;
 
   constructor(
-    private readonly levelCount: number,
+    private readonly maxLevel: number,
     private readonly store: KeyValueStore = detectStore(),
   ) {
     this.data = this.load();
@@ -116,7 +136,7 @@ export class SaveManager {
     }
     try {
       const parsed: unknown = JSON.parse(text);
-      const clean = sanitizeSave(parsed, this.levelCount);
+      const clean = sanitizeSave(parsed, this.maxLevel);
       if (!parsed || typeof parsed !== 'object') this.recovered = true;
       this.write(clean);
       return clean;
@@ -140,8 +160,9 @@ export class SaveManager {
     return this.data;
   }
 
+  /** The tutorial (0) is always open; others up to the highest unlocked id. */
   isUnlocked(levelId: number): boolean {
-    return levelId >= 1 && levelId <= this.data.unlocked;
+    return levelId >= 0 && levelId <= this.data.unlocked;
   }
 
   progress(levelId: number): LevelProgress {
@@ -154,6 +175,24 @@ export class SaveManager {
 
   setSound(on: boolean): void {
     this.data.sound = on;
+    this.write(this.data);
+  }
+
+  get lang(): Lang | null {
+    return this.data.lang;
+  }
+
+  setLang(lang: Lang | null): void {
+    this.data.lang = lang;
+    this.write(this.data);
+  }
+
+  get playerName(): string {
+    return this.data.playerName;
+  }
+
+  setPlayerName(name: string): void {
+    this.data.playerName = cleanName(name);
     this.write(this.data);
   }
 
@@ -174,16 +213,15 @@ export class SaveManager {
         stars: Math.max(prev.stars, stars),
         completed: true,
       };
-      if (levelId + 1 <= this.levelCount && this.data.unlocked < levelId + 1) this.data.unlocked = levelId + 1;
+      if (levelId + 1 <= this.maxLevel && this.data.unlocked < levelId + 1) this.data.unlocked = levelId + 1;
     }
     this.write(this.data);
     return newBest;
   }
 
   reset(): void {
-    const keepSound = this.data.sound;
-    this.data = defaultSave();
-    this.data.sound = keepSound;
+    const { sound, lang, playerName } = this.data;
+    this.data = { ...defaultSave(), sound, lang, playerName };
     this.write(this.data);
   }
 }

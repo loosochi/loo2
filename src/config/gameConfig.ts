@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
 import { BootScene } from '../scenes/BootScene';
+import { EditorScene } from '../scenes/EditorScene';
 import { GameScene } from '../scenes/GameScene';
 import { LevelSelectScene } from '../scenes/LevelSelectScene';
 import { MenuScene } from '../scenes/MenuScene';
+import { RecordsScene } from '../scenes/RecordsScene';
 import { ResultScene } from '../scenes/ResultScene';
 import { COLORS } from './theme';
 
@@ -26,6 +28,6 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
     },
     disableContextMenu: true,
     fps: { target: 60, smoothStep: true },
-    scene: [BootScene, MenuScene, LevelSelectScene, GameScene, ResultScene],
+    scene: [BootScene, MenuScene, LevelSelectScene, GameScene, ResultScene, RecordsScene, EditorScene],
   };
 }

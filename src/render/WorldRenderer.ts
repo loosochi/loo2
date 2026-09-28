@@ -4,7 +4,7 @@ import { COLORS } from '../config/theme';
 import { Intersection } from '../entities/Intersection';
 import { Road } from '../entities/Road';
 import type { Vehicle } from '../entities/Vehicle';
-import type { RuntimeRoute } from '../systems/RouteNetwork';
+import { isYieldZone, type RuntimeRoute } from '../systems/RouteNetwork';
 import type { TrafficSimulation } from '../systems/TrafficSimulation';
 import { LightState, type Dir, type LightDef, type Vec2 } from '../types';
 import { dirVector } from '../utils/geometry';
@@ -269,7 +269,7 @@ export class WorldRenderer {
 
   /** Shark-teeth give-way line and a yield sign where a free right turn merges. */
   private drawYield(g: Phaser.GameObjects.Graphics, r: RuntimeRoute): void {
-    const z = r.zones[0];
+    const z = r.zones.find((rz) => isYieldZone(r, rz));
     if (!z) return;
     const s = Math.max(0, z.sEnter - 6);
     const p = r.path.pointAt(s);

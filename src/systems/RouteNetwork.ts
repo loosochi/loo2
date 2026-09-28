@@ -26,16 +26,23 @@ export interface RuntimeRoute {
   path: Path;
   stops: RouteStop[];
   zones: RouteZone[];
+  /** Free routes: arc position where the slip lane leaves the through lane (else Infinity). */
+  slipStart: number;
+}
+
+/** Zones at or after this point of a free route are handled by yielding, not by signals. */
+export function isYieldZone(r: RuntimeRoute, rz: RouteZone): boolean {
+  return r.def.free === true && rz.sEnter >= r.slipStart - 8;
 }
 
 export function buildRuntimeRoutes(defs: RouteDef[]): RuntimeRoute[] {
-  return defs.map((def) => ({
-    id: def.id,
-    def,
-    spawnId: def.spawnId,
-    exitId: def.exitId,
-    path: new Path(def.points),
-    stops: [],
-    zones: [],
-  }));
+  return defs.map((def) => {
+    const path = new Path(def.points);
+    let slipStart = Infinity;
+    if (def.free) {
+      const i = path.curvature.findIndex((k) => k > 1e-3);
+      slipStart = i >= 0 ? i * path.step : 0;
+    }
+    return { id: def.id, def, spawnId: def.spawnId, exitId: def.exitId, path, stops: [], zones: [], slipStart };
+  });
 }

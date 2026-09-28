@@ -2,7 +2,7 @@ import { DRIVING, SCORE, SIM } from '../config/balanceConfig';
 import { Vehicle } from '../entities/Vehicle';
 import { LightState, VehicleState, type GameOutcome, type LevelDef, type LevelResult } from '../types';
 import { CollisionSystem, type CrashInfo } from './CollisionSystem';
-import { buildRuntimeRoutes, type RouteStop, type RuntimeRoute } from './RouteNetwork';
+import { buildRuntimeRoutes, isYieldZone, type RouteStop, type RuntimeRoute } from './RouteNetwork';
 import { ScoreSystem } from './ScoreSystem';
 import { TrafficLightSystem, type LightChange } from './TrafficLightSystem';
 import { VehicleSpawner } from './VehicleSpawner';
@@ -247,7 +247,12 @@ export class TrafficSimulation {
    * or null when it may proceed.
    */
   private resolveStop(v: Vehicle, leader: { gap: number } | null): number | null {
-    if (v.route.def.free) return this.resolveYield(v);
+    const atSignal = this.resolveSignals(v, leader);
+    if (atSignal !== null || !v.route.def.free) return atSignal;
+    return this.resolveYield(v);
+  }
+
+  private resolveSignals(v: Vehicle, leader: { gap: number } | null): number | null {
     const stops = v.route.stops;
     for (let i = v.nextStop; i < stops.length; i++) {
       const stop = stops[i];
@@ -294,7 +299,7 @@ export class TrafficSimulation {
    */
   private resolveYield(v: Vehicle): number | null {
     for (const rz of v.route.zones) {
-      if (v.committedZones.has(rz.zone.id)) continue;
+      if (!isYieldZone(v.route, rz) || v.committedZones.has(rz.zone.id)) continue;
       const dist = rz.sEnter - v.front;
       if (dist < 0) {
         v.committedZones.add(rz.zone.id);

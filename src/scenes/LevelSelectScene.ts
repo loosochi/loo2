@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { COLORS } from '../config/theme';
+import { t } from '../i18n';
 import { levelManager } from '../systems/LevelManager';
 import { Button } from '../ui/Button';
 import { LevelCard } from '../ui/LevelCard';
@@ -46,9 +47,9 @@ export class LevelSelectScene extends Phaser.Scene {
       style: 'secondary',
       onClick: () => goTo(this, 'Menu'),
     });
-    const title = makeText(this, W / 2, pad + btn / 2, 'SELECT LEVEL', { size: 26 * s, bold: true }).setOrigin(0.5);
+    const title = makeText(this, W / 2, pad + btn / 2, t('levels.title'), { size: 26 * s, bold: true }).setOrigin(0.5);
     const starG = this.add.graphics();
-    const starTxt = makeText(this, W - pad, pad + btn / 2, `${lm.totalStars}/${lm.levels.length * 5}`, {
+    const starTxt = makeText(this, W - pad, pad + btn / 2, `${lm.totalStars}/${lm.starLevels.length * 5}`, {
       size: 16 * s,
       bold: true,
       color: COLORS.star,
@@ -61,7 +62,7 @@ export class LevelSelectScene extends Phaser.Scene {
 
     const header = title.y + 34 * s;
     const n = lm.levels.length;
-    const cols = W < 560 ? 2 : W < 960 ? 3 : 5;
+    const cols = W < 560 ? 2 : W < 900 && H > W ? 3 : 5;
     const rows = Math.ceil(n / cols);
     const gap = 14 * s;
     const availH = H - header - pad;

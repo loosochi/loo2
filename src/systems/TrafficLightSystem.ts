@@ -49,12 +49,10 @@ export class TrafficLightSystem {
   bindRoutes(routes: RuntimeRoute[]): void {
     for (const r of routes) {
       const stops: { light: TrafficLight; s: number }[] = [];
-      // Free (slip-lane) turns bypass the signals and yield instead.
-      if (!r.def.free) {
-        for (const light of this.lights) {
-          const s = crossingOf(r, light.def);
-          if (s !== null) stops.push({ light, s });
-        }
+      for (const light of this.lights) {
+        const s = crossingOf(r, light.def);
+        // Free (slip-lane) turns bypass the signal at the turn and yield instead.
+        if (s !== null && s < r.slipStart - 4) stops.push({ light, s });
       }
       stops.sort((a, b) => a.s - b.s);
       r.stops = stops.map((st, index) => ({ index, light: st.light, s: st.s }));

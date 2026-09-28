@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { COLORS } from '../config/theme';
+import { levelName, t } from '../i18n';
 import { audio } from '../systems/AudioManager';
 import type { LevelDef } from '../types';
 import { drawIcon, drawStar, makeText } from './uiKit';
@@ -33,12 +34,13 @@ export class LevelCard extends Phaser.GameObjects.Container {
 
     const s = Math.min(w, h * 1.1);
     const numSize = s * 0.3;
-    const num = makeText(scene, 0, -h * 0.22, String(o.level.id), {
-      size: numSize,
+    const num = makeText(scene, 0, -h * 0.22, o.level.id === 0 ? t('levels.tutorial') : String(o.level.id), {
+      size: o.level.id === 0 ? numSize * 0.36 : numSize,
       bold: true,
       color: o.unlocked ? COLORS.text : COLORS.textDim,
     }).setOrigin(0.5);
-    const name = makeText(scene, 0, h * 0.06, o.level.name.toUpperCase(), {
+    const tutorial = o.level.id === 0;
+    const name = makeText(scene, 0, h * 0.06, levelName(o.level).toUpperCase(), {
       size: Math.max(11, s * 0.085),
       bold: true,
       color: o.unlocked ? COLORS.text : COLORS.textDim,
@@ -47,7 +49,14 @@ export class LevelCard extends Phaser.GameObjects.Container {
     }).setOrigin(0.5);
     this.add([num, name]);
 
-    if (o.unlocked) {
+    if (o.unlocked && tutorial) {
+      if (o.stars > 0) {
+        const done = scene.add.graphics();
+        drawIcon(done, 'check', s * 0.2, COLORS.good);
+        done.y = h * 0.3;
+        this.add(done);
+      }
+    } else if (o.unlocked) {
       const sg = scene.add.graphics();
       const r = Math.min(9, w / 16);
       for (let i = 0; i < 5; i++) {
@@ -55,14 +64,14 @@ export class LevelCard extends Phaser.GameObjects.Container {
       }
       this.add(sg);
       if (o.bestScore > 0) {
-        const best = makeText(scene, 0, h * 0.43, `BEST ${o.bestScore}`, { size: Math.max(9, s * 0.065), color: COLORS.textDim }).setOrigin(0.5);
+        const best = makeText(scene, 0, h * 0.43, t('levels.best', { n: o.bestScore }), { size: Math.max(9, s * 0.065), color: COLORS.textDim }).setOrigin(0.5);
         this.add(best);
       }
     } else {
       const lock = scene.add.graphics();
       drawIcon(lock, 'lock', s * 0.2, COLORS.textDim);
       lock.y = h * 0.3;
-      const locked = makeText(scene, 0, h * 0.43, 'LOCKED', { size: Math.max(9, s * 0.065), color: COLORS.textDim }).setOrigin(0.5);
+      const locked = makeText(scene, 0, h * 0.43, t('levels.locked'), { size: Math.max(9, s * 0.065), color: COLORS.textDim }).setOrigin(0.5);
       this.add([lock, locked]);
     }
 

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { COLORS } from '../config/theme';
 import { generateTextures } from '../render/textures';
+import { detectLang, setLang } from '../i18n';
 import { audio } from '../systems/AudioManager';
 import { levelManager } from '../systems/LevelManager';
 import { makeText } from '../ui/uiKit';
@@ -17,6 +18,8 @@ export class BootScene extends Phaser.Scene {
     generateTextures(this);
     const lm = levelManager();
     audio.setEnabled(lm.save.soundEnabled);
+    setLang(lm.save.lang ?? detectLang());
+    document.documentElement.lang = lm.save.lang ?? detectLang();
     this.scene.start('Menu');
   }
 }

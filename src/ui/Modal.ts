@@ -28,10 +28,11 @@ export class Modal extends Phaser.GameObjects.Container {
     const dim = scene.add.rectangle(0, 0, W, H, COLORS.bgDeep, 0.72).setOrigin(0).setInteractive();
     this.add(dim);
 
-    const pw = Math.min(W - 32, 340 * s);
-    const bh = Math.max(46, 54 * s);
+    const pw = Math.min(W - 32, 360 * s);
     const gap = 12 * s;
     const titleH = 60 * s + (o.subtitle ? 26 * s : 0);
+    // Shrink buttons on short screens so the panel always fits.
+    const bh = Math.max(40, Math.min(Math.max(46, 54 * s), (H - 24 - titleH - 24 * s) / o.buttons.length - gap));
     const ph = titleH + o.buttons.length * (bh + gap) + 24 * s;
     const px = (W - pw) / 2;
     const py = (H - ph) / 2;
@@ -40,7 +41,7 @@ export class Modal extends Phaser.GameObjects.Container {
     this.add(g);
     this.add(makeText(scene, W / 2, py + 34 * s, o.title, { size: 28 * s, bold: true }).setOrigin(0.5));
     if (o.subtitle) {
-      this.add(makeText(scene, W / 2, py + 64 * s, o.subtitle, { size: 15 * s, color: COLORS.textDim, align: 'center' }).setOrigin(0.5));
+      this.add(makeText(scene, W / 2, py + 64 * s, o.subtitle, { size: 15 * s, color: COLORS.textDim, align: 'center', wrap: pw - 32 }).setOrigin(0.5));
     }
     o.buttons.forEach((b, i) => {
       const btn = new Button(scene, W / 2, py + titleH + bh / 2 + i * (bh + gap), {

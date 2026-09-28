@@ -2,7 +2,7 @@
  * Tiny procedural sound engine on the Web Audio API — no audio files needed.
  * All sounds are short and quiet; everything is silenced when sound is disabled.
  */
-export type SoundId = 'click' | 'light' | 'yellow' | 'crash' | 'win' | 'lose' | 'pass' | 'spawn';
+export type SoundId = 'click' | 'light' | 'yellow' | 'crash' | 'win' | 'lose' | 'pass' | 'spawn' | 'siren';
 
 type Ctx = AudioContext;
 
@@ -102,6 +102,13 @@ class AudioManager {
         break;
       case 'lose':
         [392, 330, 262].forEach((f, i) => this.tone(f, 0.25, 'triangle', 0.14, i * 0.14));
+        break;
+      case 'siren':
+        // Soft two-tone wail, three cycles.
+        for (let i = 0; i < 3; i++) {
+          this.tone(740, 0.3, 'sine', 0.06, i * 0.6, 980);
+          this.tone(980, 0.3, 'sine', 0.06, i * 0.6 + 0.3, 740);
+        }
         break;
     }
   }

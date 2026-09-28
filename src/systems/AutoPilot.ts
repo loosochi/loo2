@@ -1,4 +1,5 @@
 import { LightState } from '../types';
+import { isYieldZone } from './RouteNetwork';
 import type { TrafficSimulation } from './TrafficSimulation';
 
 type Mode = 'green' | 'clear';
@@ -37,6 +38,7 @@ export class AutoPilot {
     const zoneUsers = new Map<string, { route: string; light: string }[]>();
     for (const r of this.sim.routes) {
       for (const rz of r.zones) {
+        if (isYieldZone(r, rz)) continue;
         let controlling: string | null = null;
         for (const st of r.stops) if (st.s < rz.sExit) controlling = st.light.id;
         if (!controlling) continue;
@@ -114,14 +116,15 @@ export class AutoPilot {
       for (const st of r.stops) {
         if (!green.has(st.light.id)) continue;
         for (const rz of r.zones) {
-          if (rz.sExit <= st.s || rz.sEnter > st.s + 120) continue;
+          if (isYieldZone(r, rz) || rz.sExit <= st.s || rz.sEnter > st.s + 120) continue;
           for (const o of this.sim.vehicles) {
             if (!zones.routesConflict(rz.zone, r.id, o.route.id)) continue;
             const orz = o.route.zones.find((z) => z.zone === rz.zone);
             if (!orz) continue;
             // Yielding (free-turn) cars only count once they are committed to the zone.
-            let controlling = o.route.def.free ? orz.sEnter - 2 : -Infinity;
-            for (const ost of o.route.stops) if (ost.s < orz.sExit) controlling = ost.s;
+            let controlling = -Infinity;
+            if (isYieldZone(o.route, orz)) controlling = orz.sEnter - 2;
+            else for (const ost of o.route.stops) if (ost.s < orz.sExit) controlling = ost.s;
             if (o.front >= controlling - 1 && o.rear <= orz.sExit + 2) return false;
           }
         }

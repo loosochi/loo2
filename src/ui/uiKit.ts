@@ -61,7 +61,30 @@ export function drawStar(g: Phaser.GameObjects.Graphics, x: number, y: number, r
   g.fillPoints(pts, true);
 }
 
-export type IconName = 'pause' | 'play' | 'restart' | 'back' | 'lock' | 'sound' | 'mute' | 'next' | 'menu' | 'grid' | 'gear';
+export type IconName =
+  | 'pause'
+  | 'play'
+  | 'restart'
+  | 'back'
+  | 'lock'
+  | 'sound'
+  | 'mute'
+  | 'next'
+  | 'menu'
+  | 'grid'
+  | 'gear'
+  | 'fit'
+  | 'trophy'
+  | 'edit'
+  | 'globe'
+  | 'user'
+  | 'share'
+  | 'check'
+  | 'download'
+  | 'plus'
+  | 'minus'
+  | 'trash'
+  | 'car';
 
 /** Simple vector icons drawn with Graphics, centred at (0, 0) within a box of size `s`. */
 export function drawIcon(g: Phaser.GameObjects.Graphics, name: IconName, s: number, color: number): void {
@@ -130,6 +153,87 @@ export function drawIcon(g: Phaser.GameObjects.Graphics, name: IconName, s: numb
       }
       g.fillStyle(COLORS.panel, 1);
       g.fillCircle(0, 0, h * 0.2);
+      break;
+    case 'fit': {
+      const a = h * 0.7;
+      const k = h * 0.32;
+      for (const [sx, sy] of [
+        [-1, -1],
+        [1, -1],
+        [1, 1],
+        [-1, 1],
+      ]) {
+        g.beginPath();
+        g.moveTo(sx * a, sy * (a - k));
+        g.lineTo(sx * a, sy * a);
+        g.lineTo(sx * (a - k), sy * a);
+        g.strokePath();
+      }
+      g.fillCircle(0, 0, h * 0.14);
+      break;
+    }
+    case 'trophy':
+      g.fillRoundedRect(-h * 0.45, -h * 0.65, h * 0.9, h * 0.6, { tl: 2, tr: 2, bl: h * 0.4, br: h * 0.4 });
+      g.fillRect(-h * 0.1, -h * 0.1, h * 0.2, h * 0.45);
+      g.fillRoundedRect(-h * 0.4, h * 0.35, h * 0.8, h * 0.22, 2);
+      g.lineStyle(Math.max(1.5, s * 0.08), color, 1);
+      g.strokeCircle(-h * 0.5, -h * 0.4, h * 0.2);
+      g.strokeCircle(h * 0.5, -h * 0.4, h * 0.2);
+      break;
+    case 'edit':
+      g.fillTriangle(-h * 0.7, h * 0.7, -h * 0.55, h * 0.25, -h * 0.25, h * 0.55);
+      g.beginPath();
+      g.moveTo(-h * 0.45, h * 0.4);
+      g.lineTo(h * 0.45, -h * 0.5);
+      g.strokePath();
+      g.fillCircle(h * 0.52, -h * 0.57, h * 0.16);
+      break;
+    case 'globe':
+      g.lineStyle(Math.max(1.5, s * 0.08), color, 1);
+      g.strokeCircle(0, 0, h * 0.65);
+      g.strokeEllipse(0, 0, h * 0.6, h * 1.3);
+      g.lineBetween(-h * 0.65, 0, h * 0.65, 0);
+      break;
+    case 'user':
+      g.fillCircle(0, -h * 0.3, h * 0.3);
+      g.fillRoundedRect(-h * 0.55, h * 0.1, h * 1.1, h * 0.55, { tl: h * 0.3, tr: h * 0.3, bl: 2, br: 2 });
+      break;
+    case 'share':
+      g.fillCircle(-h * 0.45, 0, h * 0.2);
+      g.fillCircle(h * 0.45, -h * 0.45, h * 0.2);
+      g.fillCircle(h * 0.45, h * 0.45, h * 0.2);
+      g.lineStyle(Math.max(1.5, s * 0.08), color, 1);
+      g.lineBetween(-h * 0.45, 0, h * 0.45, -h * 0.45);
+      g.lineBetween(-h * 0.45, 0, h * 0.45, h * 0.45);
+      break;
+    case 'check':
+      g.beginPath();
+      g.moveTo(-h * 0.6, 0);
+      g.lineTo(-h * 0.15, h * 0.45);
+      g.lineTo(h * 0.65, -h * 0.5);
+      g.strokePath();
+      break;
+    case 'download':
+      g.fillRect(-h * 0.1, -h * 0.7, h * 0.2, h * 0.7);
+      g.fillTriangle(-h * 0.4, -h * 0.05, h * 0.4, -h * 0.05, 0, h * 0.4);
+      g.fillRect(-h * 0.65, h * 0.5, h * 1.3, h * 0.18);
+      break;
+    case 'plus':
+      g.fillRect(-h * 0.6, -h * 0.1, h * 1.2, h * 0.2);
+      g.fillRect(-h * 0.1, -h * 0.6, h * 0.2, h * 1.2);
+      break;
+    case 'minus':
+      g.fillRect(-h * 0.6, -h * 0.1, h * 1.2, h * 0.2);
+      break;
+    case 'trash':
+      g.fillRect(-h * 0.55, -h * 0.55, h * 1.1, h * 0.16);
+      g.fillRect(-h * 0.15, -h * 0.7, h * 0.3, h * 0.16);
+      g.fillRoundedRect(-h * 0.42, -h * 0.35, h * 0.84, h * 1.0, 2);
+      break;
+    case 'car':
+      g.fillRoundedRect(-h * 0.7, -h * 0.35, h * 1.4, h * 0.7, h * 0.2);
+      g.fillStyle(COLORS.panel, 1);
+      g.fillRect(h * 0.1, -h * 0.25, h * 0.22, h * 0.5);
       break;
   }
 }
