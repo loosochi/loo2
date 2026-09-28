@@ -152,8 +152,8 @@ function sanitizeNetwork(raw: unknown): NetworkData | null {
     lights,
     spawns,
     exits,
-    specials: specials.length ? specials : undefined,
-    decor: decor.length ? decor : undefined,
+    specials: Array.isArray(r.specials) ? specials : undefined,
+    decor: Array.isArray(r.decor) ? decor : undefined,
     nextId: isNum(r.nextId) ? Math.max(r.nextId, nodes.length + edges.length + 1) : nodes.length + edges.length + 100,
   };
 }
