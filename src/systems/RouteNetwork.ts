@@ -32,8 +32,16 @@ export interface RuntimeRoute {
 
 /** Zones at or after this point of a free route are handled by yielding, not by signals. */
 export function isYieldZone(r: RuntimeRoute, rz: RouteZone): boolean {
-  return r.def.free === true && rz.sEnter >= r.slipStart - 8;
+  if (r.def.free === true && rz.sEnter >= r.slipStart - 8) return true;
+  // Unsignalled junction without right of way (road networks).
+  const ys = r.def.yields;
+  if (!ys) return false;
+  const z = rz.zone;
+  return ys.some((y) => Math.hypot(z.x - y.x, z.y - y.y) < y.r);
 }
+
+/** Does this route ever have to give way? */
+export const hasYields = (r: RuntimeRoute): boolean => r.def.free === true || (r.def.yields?.length ?? 0) > 0;
 
 export function buildRuntimeRoutes(defs: RouteDef[]): RuntimeRoute[] {
   return defs.map((def) => {

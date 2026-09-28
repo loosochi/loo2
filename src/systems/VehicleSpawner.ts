@@ -31,13 +31,13 @@ export class VehicleSpawner {
   private specials: { def: SpecialDef; done: boolean; blocked: boolean }[] = [];
   private rng: SeededRandom;
   private nextId = 1;
-  private readonly routesById: Map<string, RuntimeRoute>;
+  private routesById: Map<string, RuntimeRoute>;
 
   constructor(
-    private readonly defs: FlowDef[],
+    private defs: FlowDef[],
     routes: RuntimeRoute[],
     private readonly seed: number,
-    private readonly specialDefs: SpecialDef[] = [],
+    private specialDefs: SpecialDef[] = [],
   ) {
     this.routesById = new Map(routes.map((r) => [r.id, r]));
     this.rng = new SeededRandom(seed);
@@ -67,6 +67,36 @@ export class VehicleSpawner {
       weights: VEHICLE_SPECS.map((spec) => ({ spec, weight: def.mix?.[spec.kind] ?? spec.weight })).filter((w) => w.weight > 0),
     }));
     this.specials = [...this.specialDefs].sort((a, b) => a.at - b.at).map((def) => ({ def, done: false, blocked: false }));
+  }
+
+  /**
+   * New routes after the road network changed mid-level. Vehicles still to come keep their
+   * counts and timing per entry; the random sequence continues.
+   */
+  replaceFlows(defs: FlowDef[], routes: RuntimeRoute[], specials: SpecialDef[]): void {
+    const old = new Map(this.flows.map((f) => [f.def.spawnId, f]));
+    const oldSpecials = this.specials;
+    this.defs = defs;
+    this.specialDefs = specials;
+    this.routesById = new Map(routes.map((r) => [r.id, r]));
+    this.flows = defs.map((def) => {
+      const prev = old.get(def.spawnId);
+      return {
+        def,
+        remaining: prev ? prev.remaining : def.count,
+        nextTime: prev ? prev.nextTime : def.startDelay,
+        blocked: false,
+        pending: null,
+        weights: VEHICLE_SPECS.map((spec) => ({ spec, weight: def.mix?.[spec.kind] ?? spec.weight })).filter((w) => w.weight > 0),
+      };
+    });
+    this.specials = [...specials]
+      .sort((a, b) => a.at - b.at)
+      .map((def) => ({
+        def,
+        done: oldSpecials.some((o) => o.done && o.def.at === def.at && o.def.kind === def.kind && o.def.spawnId === def.spawnId),
+        blocked: false,
+      }));
   }
 
   get totalCars(): number {

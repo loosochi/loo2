@@ -92,9 +92,11 @@ export class ScoreSystem {
     return { score: this.liveScore, passed: this.passed, crashes: this.crashes, avgWait: this.avgWait, maxWait: this.maxWait };
   }
 
-  finalScore(outcome: GameOutcome, time: number, criteria: StarCriteria): number {
+  /** `bonus` is added on a win (e.g. unspent build budget). */
+  finalScore(outcome: GameOutcome, time: number, criteria: StarCriteria, bonus = 0): number {
     let score = this.exitPoints - this.penalties - this.crashes * SCORE.crashPenalty;
     if (outcome === 'win') {
+      score += bonus;
       score += Math.max(0, criteria.parTime - time) * SCORE.timeBonusPerSecond;
       score += Math.max(0, criteria.avgWait - this.avgWait) * SCORE.waitBonusPerSecond;
       if (this.crashes === 0) score += SCORE.noCrashBonus;
@@ -113,8 +115,8 @@ export class ScoreSystem {
     ];
   }
 
-  buildResult(levelId: number, outcome: GameOutcome, time: number, totalCars: number, criteria: StarCriteria): LevelResult {
-    const score = this.finalScore(outcome, time, criteria);
+  buildResult(levelId: number, outcome: GameOutcome, time: number, totalCars: number, criteria: StarCriteria, bonus = 0): LevelResult {
+    const score = this.finalScore(outcome, time, criteria, bonus);
     const starBreakdown = this.starBreakdown(outcome, time, score, criteria);
     return {
       levelId,

@@ -48,6 +48,8 @@ export class Vehicle {
   nextStop = 0;
   /** Stops the car is committed to cross regardless of signal (cannot stop in time / yellow pass). */
   readonly committed = new Set<number>();
+  /** True while the car is waiting to give way at an unsignalled junction or slip lane. */
+  yielding = false;
   /** Conflict zones a yielding (free-turn) car has committed to enter. */
   readonly committedZones = new Set<string>();
 

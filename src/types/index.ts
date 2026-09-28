@@ -25,7 +25,7 @@ export enum VehicleState {
   CRASHED = 'CRASHED',
 }
 
-export type CarKind = 'compact' | 'sedan' | 'hatch' | 'sport';
+export type CarKind = 'compact' | 'sedan' | 'hatch' | 'sport' | 'taxi';
 export type HeavyKind = 'bus' | 'truck';
 export type EmergencyKind = 'ambulance' | 'police' | 'fire';
 export type VehicleKind = CarKind | HeavyKind | EmergencyKind;
@@ -67,6 +67,8 @@ export interface LightDef {
   /** Where the signal head is drawn (roadside). */
   head: Vec2;
   initial?: LightState;
+  /** Travel heading in radians (overrides `dir`; used by free-form road networks). */
+  angle?: number;
 }
 
 /** A waypoint of a route. Interior waypoints are rounded into smooth curves. */
@@ -82,6 +84,12 @@ export interface RouteDef {
   spawnId: string;
   exitId: string;
   points: WaypointDef[];
+  /** Junctions where this route has no right of way: yield inside circle (x, y, r). */
+  yields?: { x: number; y: number; r: number }[];
+  /** Network routes: nodes passed, in order (used by analytics). */
+  nodes?: string[];
+  /** Network routes: edges travelled, in order. */
+  edges?: string[];
   /**
    * Free (slip-lane) right turn: not controlled by any traffic light. Cars yield at the
    * conflict zones on this route instead of stopping at a signal.
@@ -191,9 +199,121 @@ export interface LevelDef {
   tutorial?: TutorialStep[];
   /** Custom level made in the editor. */
   custom?: boolean;
+  /** 2 = level built from an editable road network (see `network`). Absent = classic level. */
+  schemaVersion?: number;
+  /** Editable road network (schema 2 levels). */
+  network?: NetworkData;
+  /** Build budget in dollars (schema 2 levels). */
+  budget?: number;
+  /** Build restrictions (schema 2 levels). */
+  rules?: BuildRules;
+  /** Level tasks; all must be met to win (schema 2 levels). */
+  objectives?: Objective[];
 }
 
-export type GameOutcome = 'win' | 'crash' | 'timeout';
+// ---------------------------------------------------------------- road network (schema 2)
+
+/** Intersection right-of-way when a junction has no traffic lights. */
+export type NodePriority = 'auto' | 'allway' | [string, string];
+
+export interface NetNode {
+  id: string;
+  x: number;
+  y: number;
+  /** Right of way at an unsignalled junction: auto (straightest wide road), all-way yield, or a main road pair. */
+  priority?: NodePriority;
+}
+
+export interface NetEdge {
+  id: string;
+  a: string;
+  b: string;
+  /** Lanes travelling a→b. */
+  f: number;
+  /** Lanes travelling b→a. */
+  bk: number;
+  /** Part of the level's fixed infrastructure: cannot be deleted or changed. */
+  locked?: boolean;
+}
+
+/** A traffic light controlling traffic that arrives at `node` via `edge`. */
+export interface NetLight {
+  node: string;
+  edge: string;
+  locked?: boolean;
+  initial?: LightState;
+}
+
+export interface NetSpawn {
+  id: string;
+  node: string;
+  count: number;
+  startDelay: number;
+  interval: [number, number];
+  mix?: Partial<Record<VehicleKind, number>>;
+  /** Allowed destinations (exit ids). Default: every reachable exit. */
+  to?: string[];
+}
+
+export interface NetExit {
+  id: string;
+  node: string;
+  /** Optional cap on how many vehicles this exit accepts (for objectives / info). */
+  capacity?: number;
+}
+
+export interface NetSpecial {
+  at: number;
+  spawn: string;
+  exit: string;
+  kind: VehicleKind;
+}
+
+export interface NetworkData {
+  nodes: NetNode[];
+  edges: NetEdge[];
+  lights: NetLight[];
+  spawns: NetSpawn[];
+  exits: NetExit[];
+  specials?: NetSpecial[];
+  decor?: DecorDef[];
+  nextId: number;
+}
+
+export type BuildTool = 'road' | 'delete' | 'light' | 'lane' | 'direction' | 'intersection' | 'spawn' | 'exit' | 'inspect' | 'decor';
+
+export interface BuildRules {
+  /** Tools the player may use (default: all game tools). */
+  allowed?: BuildTool[];
+  maxRoadLength?: number;
+  maxRoadCount?: number;
+  maxTrafficLights?: number;
+}
+
+export type ObjectiveType =
+  | 'PASS_CARS'
+  | 'PASS_CARS_WITHOUT_CRASH'
+  | 'MAX_WAIT_TIME'
+  | 'MAX_QUEUE_LENGTH'
+  | 'BUDGET_LIMIT'
+  | 'BUILD_LIMIT'
+  | 'EMERGENCY_PRIORITY'
+  | 'TIME_LIMIT';
+
+export interface Objective {
+  type: ObjectiveType;
+  value: number;
+}
+
+export type ObjectiveStatus = 'pending' | 'done' | 'failed';
+
+export interface ObjectiveState extends Objective {
+  status: ObjectiveStatus;
+  /** Current measured value shown in the HUD. */
+  current: number;
+}
+
+export type GameOutcome = 'win' | 'crash' | 'timeout' | 'failed';
 
 export interface LevelResult {
   levelId: number;
@@ -207,6 +327,9 @@ export interface LevelResult {
   maxWait: number;
   crashes: number;
   starBreakdown: StarCheck[];
+  objectives?: ObjectiveState[];
+  /** Money spent on construction (network levels). */
+  spent?: number;
 }
 
 export type StarCheckId = 'complete' | 'par' | 'avgWait' | 'maxWait' | 'score';

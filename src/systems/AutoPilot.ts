@@ -23,7 +23,7 @@ export class AutoPilot {
     this.buildConflicts();
     this.phases = this.buildPhases();
     this.phase = this.pickInitialPhase();
-    this.apply(this.phases[this.phase]);
+    if (this.phases.length) this.apply(this.phases[this.phase]);
   }
 
   /** Lights that must never be green together. */
@@ -96,7 +96,7 @@ export class AutoPilot {
     let n = 0;
     for (const v of this.sim.vehicles) {
       const st = v.route.stops[v.nextStop];
-      if (st && st.light.id === lightId && st.s - v.front < 220) n++;
+      if (st && st.light.id === lightId && st.s - v.front < 220) n += v.emergency ? 10 : 1;
     }
     return n;
   }
@@ -142,7 +142,7 @@ export class AutoPilot {
 
   /** Call once per simulation step. */
   update(dt: number): void {
-    if (this.sim.status !== 'running') return;
+    if (this.sim.status !== 'running' || this.phases.length === 0) return;
     this.timer += dt;
     if (this.mode === 'green') {
       const cur = this.phaseDemand(this.phase);

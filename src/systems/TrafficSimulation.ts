@@ -2,7 +2,8 @@ import { DRIVING, SCORE, SIM } from '../config/balanceConfig';
 import { Vehicle } from '../entities/Vehicle';
 import { LightState, VehicleState, type GameOutcome, type LevelDef, type LevelResult } from '../types';
 import { CollisionSystem, type CrashInfo } from './CollisionSystem';
-import { buildRuntimeRoutes, isYieldZone, type RouteStop, type RuntimeRoute } from './RouteNetwork';
+import { buildRuntimeRoutes, hasYields, isYieldZone, type RouteStop, type RuntimeRoute } from './RouteNetwork';
+import { ObjectiveTracker, type BuildStats } from './ObjectiveTracker';
 import { ScoreSystem } from './ScoreSystem';
 import { TrafficLightSystem, type LightChange } from './TrafficLightSystem';
 import { VehicleSpawner } from './VehicleSpawner';
@@ -35,12 +36,16 @@ const CURVE_TURNING = 0.012;
  * Owns vehicles, lights, spawner, collisions and scoring for one level.
  */
 export class TrafficSimulation {
-  readonly level: LevelDef;
-  readonly routes: RuntimeRoute[];
-  readonly lights: TrafficLightSystem;
+  level: LevelDef;
+  routes: RuntimeRoute[];
+  lights: TrafficLightSystem;
   readonly collisions = new CollisionSystem();
   readonly score = new ScoreSystem();
   readonly spawner: VehicleSpawner;
+  /** Level objectives (road-network levels); null for classic levels. */
+  objectives: ObjectiveTracker | null;
+  /** Construction statistics, kept up to date by the build manager. */
+  buildStats: BuildStats = { spent: 0, builds: 0 };
 
   vehicles: Vehicle[] = [];
   time = 0;
@@ -59,9 +64,39 @@ export class TrafficSimulation {
     this.routes = buildRuntimeRoutes(level.routes);
     this.lights = new TrafficLightSystem(level.lights);
     this.lights.bindRoutes(this.routes);
-    this.collisions.buildZones(this.routes);
+    this.collisions.buildZones(this.routes, !!level.network);
     this.spawner = new VehicleSpawner(level.flows, this.routes, level.seed, level.specials ?? []);
     this.lights.onChange((c) => this.events.light?.(c));
+    this.objectives = level.objectives?.length ? new ObjectiveTracker(level.objectives) : null;
+  }
+
+  /**
+   * Swap in a re-compiled road network while the level is paused. Vehicles already driving keep
+   * their current routes; lights keep their states; new vehicles use the new routes.
+   */
+  applyNetwork(level: LevelDef): void {
+    const fresh = buildRuntimeRoutes(level.routes);
+    const inUse = [...new Set(this.vehicles.map((v) => v.route))];
+    const all = [...fresh, ...inUse];
+    const states = new Map(this.lights.lights.map((l) => [l.id, l.state]));
+    this.lights = new TrafficLightSystem(level.lights);
+    for (const l of this.lights.lights) {
+      const st = states.get(l.id);
+      if (st) l.state = st;
+    }
+    this.lights.onChange((c) => this.events.light?.(c));
+    this.lights.bindRoutes(all);
+    this.collisions.buildZones(all, !!level.network);
+    for (const v of this.vehicles) {
+      v.committed.clear();
+      v.committedZones.clear();
+      v.nextStop = v.route.stops.findIndex((st) => st.s > v.front);
+      if (v.nextStop < 0) v.nextStop = v.route.stops.length;
+    }
+    this.spawner.replaceFlows(level.flows, fresh, level.specials ?? []);
+    this.routes = all;
+    this.level = level;
+    this.collisions.updateOccupancy(this.vehicles);
   }
 
   on(events: SimEvents): void {
@@ -80,6 +115,7 @@ export class TrafficSimulation {
     this.accumulator = 0;
     this.actions.length = 0;
     this.lights.reset();
+    this.objectives = this.level.objectives?.length ? new ObjectiveTracker(this.level.objectives) : null;
     this.spawner.reset();
     this.score.reset();
     this.collisions.updateOccupancy(this.vehicles);
@@ -186,6 +222,13 @@ export class TrafficSimulation {
 
     for (const v of this.vehicles) this.updateState(v);
 
+    if (this.objectives) {
+      this.objectives.update(this, this.buildStats, dt);
+      if (this.objectives.failed) {
+        this.finish('failed');
+        return;
+      }
+    }
     if (this.score.passed >= this.level.goal.carsToPass) this.finish('win');
     else if (this.level.goal.timeLimit !== undefined && this.time >= this.level.goal.timeLimit) this.finish('timeout');
   }
@@ -194,7 +237,11 @@ export class TrafficSimulation {
     this.status = outcome === 'win' ? 'won' : 'lost';
     this.outcome = outcome;
     for (const v of this.vehicles) this.score.trackWait(v.waitTime);
-    this.result = this.score.buildResult(this.level.id, outcome, this.time, this.totalCars, this.level.stars);
+    if (outcome === 'win') this.objectives?.complete();
+    const left = this.level.budget !== undefined ? Math.max(0, this.level.budget - this.buildStats.spent) : 0;
+    this.result = this.score.buildResult(this.level.id, outcome, this.time, this.totalCars, this.level.stars, left * SCORE.budgetBonusPerDollar);
+    if (this.objectives) this.result.objectives = this.objectives.states.map((o) => ({ ...o }));
+    if (this.level.budget !== undefined) this.result.spent = this.buildStats.spent;
     this.events.end?.(this.result);
   }
 
@@ -248,8 +295,13 @@ export class TrafficSimulation {
    */
   private resolveStop(v: Vehicle, leader: { gap: number } | null): number | null {
     const atSignal = this.resolveSignals(v, leader);
-    if (atSignal !== null || !v.route.def.free) return atSignal;
-    return this.resolveYield(v);
+    if (atSignal !== null || !hasYields(v.route)) {
+      v.yielding = false;
+      return atSignal;
+    }
+    const y = this.resolveYield(v);
+    v.yielding = y !== null;
+    return y;
   }
 
   private resolveSignals(v: Vehicle, leader: { gap: number } | null): number | null {
@@ -288,6 +340,11 @@ export class TrafficSimulation {
         v.committed.add(i); // too close to stop safely — carries on through
         continue;
       }
+      // Emergency vehicles may cross on red after slowing down, when the junction is clear.
+      if (v.emergency && dist < 16 && v.speed < 30 && this.zonesClearAfter(v, stop, DRIVING.yieldHorizon)) {
+        v.committed.add(i);
+        continue;
+      }
       return stop.s;
     }
     return null;
@@ -306,7 +363,7 @@ export class TrafficSimulation {
         continue;
       }
       if (dist > STOP_SCAN) return null;
-      const clear = this.collisions.isZoneClear(v, rz, this.vehicles, DRIVING.yieldHorizon);
+      const clear = this.collisions.isZoneClear(v, rz, this.vehicles, DRIVING.yieldHorizon, true);
       if (clear) {
         if (dist < DRIVING.yieldCommit) v.committedZones.add(rz.zone.id);
         continue;
@@ -320,10 +377,10 @@ export class TrafficSimulation {
     return null;
   }
 
-  private zonesClearAfter(v: Vehicle, stop: RouteStop): boolean {
+  private zonesClearAfter(v: Vehicle, stop: RouteStop, horizon?: number): boolean {
     for (const rz of v.route.zones) {
       if (rz.sExit <= stop.s || rz.sEnter > stop.s + ZONE_SCAN_AFTER_STOP) continue;
-      if (!this.collisions.isZoneClear(v, rz, this.vehicles)) return false;
+      if (!this.collisions.isZoneClear(v, rz, this.vehicles, horizon)) return false;
     }
     return true;
   }

@@ -97,10 +97,10 @@ export class TrafficLightSystem {
  * travelling in the light's direction, or null.
  */
 function crossingOf(r: RuntimeRoute, def: LightDef): number | null {
-  const d = dirVector(def.dir);
+  const want = def.angle ?? dirAngle(def.dir);
+  const d = def.angle !== undefined ? { x: Math.cos(def.angle), y: Math.sin(def.angle) } : dirVector(def.dir);
   const pts = r.path.points;
   const step = r.path.step;
-  const want = dirAngle(def.dir);
   for (let i = 0; i < pts.length - 1; i++) {
     const a = (pts[i].x - def.stop.x) * d.x + (pts[i].y - def.stop.y) * d.y;
     const b = (pts[i + 1].x - def.stop.x) * d.x + (pts[i + 1].y - def.stop.y) * d.y;

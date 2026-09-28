@@ -102,4 +102,36 @@ export const SCORE = {
   queuePenaltyPerSecond: 6,
   /** Penalty per second an emergency vehicle is standing still. */
   emergencyWaitPenaltyPerSecond: 30,
+  /** Points per unspent dollar of build budget (road-network levels). */
+  budgetBonusPerDollar: 0.2,
+} as const;
+
+/** Construction (PHASE 2): grid, snapping, costs and limits. World units: 1 lane = 28. */
+export const BUILD = {
+  /** Build grid spacing. */
+  gridSize: 40,
+  /** Pointer distance within which a road end snaps to an existing node or road. */
+  roadSnapDistance: 26,
+  /** One billing unit of road length. */
+  costUnit: 40,
+  minRoadLength: 60,
+  defaultMaxRoadLength: 1200,
+  /** Junctions closer than this to each other are refused. */
+  minNodeGap: 70,
+  /** Smallest angle between two roads meeting at a junction (radians). */
+  minJunctionAngle: Math.PI / 4 - 0.01,
+} as const;
+
+export const BUILD_COSTS = {
+  /** Per unit (BUILD.costUnit) of road, for a standard 1 + 1 lane road. */
+  road: 100,
+  trafficLight: 500,
+  /** Each additional lane. */
+  lane: 700,
+  /** Changing a junction's right of way. */
+  intersection: 1000,
+  direction: 0,
+  delete: 0,
+  spawn: 0,
+  exit: 0,
 } as const;

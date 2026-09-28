@@ -43,15 +43,20 @@ export class CollisionSystem {
   zones: ConflictZone[] = [];
 
   /** Detect crossing and merge points between routes that start from different spawn points. */
-  buildZones(routes: RuntimeRoute[]): void {
+  /**
+   * `sameSpawnConflicts`: also look for conflicts between routes from the same entry after
+   * their shared first stretch (routes of a road network can split and cross again later).
+   */
+  buildZones(routes: RuntimeRoute[], sameSpawnConflicts = false): void {
     type Raw = { x: number; y: number; radius: number; a: string; b: string };
     const raw: Raw[] = [];
     for (let i = 0; i < routes.length; i++) {
       for (let j = i + 1; j < routes.length; j++) {
         const A = routes[i];
         const B = routes[j];
-        if (A.spawnId === B.spawnId) continue; // same lane at the start: handled by car-following
-        for (const run of nearRuns(A, B)) {
+        const same = A.spawnId === B.spawnId;
+        if (same && !sameSpawnConflicts) continue; // same lane at the start: handled by car-following
+        for (const run of nearRuns(A, B, same)) {
           raw.push({ ...run, a: A.id, b: B.id });
         }
       }
@@ -140,11 +145,23 @@ export class CollisionSystem {
    * Safe-passage check before entering a zone: no vehicle on a conflicting route is inside
    * it or about to enter it without stopping.
    */
-  isZoneClear(v: Vehicle, rz: RouteZone, vehicles: readonly Vehicle[], horizon: number = DRIVING.zoneSafetyHorizon): boolean {
+  isZoneClear(
+    v: Vehicle,
+    rz: RouteZone,
+    vehicles: readonly Vehicle[],
+    horizon: number = DRIVING.zoneSafetyHorizon,
+    asYielder = false,
+  ): boolean {
     for (const o of vehicles) {
       if (o === v || !this.routesConflict(rz.zone, v.route.id, o.route.id)) continue;
       const orz = o.route.zones.find((e) => e.zone === rz.zone);
       if (!orz) continue;
+      // Two cars both giving way: emergency vehicles first, then whoever entered the map first.
+      if (asYielder && o.yielding && o.stopTarget !== null && o.stopTarget - o.front < 10) {
+        const oFirst = (o.emergency && !v.emergency) || (o.emergency === v.emergency && o.id < v.id);
+        if (oFirst) return false;
+        continue;
+      }
       if (this.arrivesSoon(o, orz, horizon)) return false;
     }
     return true;
@@ -171,7 +188,7 @@ export class CollisionSystem {
 }
 
 /** Find contiguous stretches where route A runs within NEAR_DIST of route B. */
-function nearRuns(A: RuntimeRoute, B: RuntimeRoute): { x: number; y: number; radius: number }[] {
+function nearRuns(A: RuntimeRoute, B: RuntimeRoute, skipShared = false): { x: number; y: number; radius: number }[] {
   const out: { x: number; y: number; radius: number }[] = [];
   const pa = A.path.points;
   const pb = B.path.points;
@@ -197,11 +214,12 @@ function nearRuns(A: RuntimeRoute, B: RuntimeRoute): { x: number; y: number; rad
     }
     if (near && runStart < 0) runStart = i;
     if (!near && runStart >= 0) {
-      flush(i - 1);
+      // A shared start (same entry lane) is car-following, not a conflict.
+      if (!(skipShared && runStart === 0)) flush(i - 1);
       runStart = -1;
     }
   }
-  if (runStart >= 0) flush(pa.length - 1);
+  if (runStart >= 0 && !(skipShared && runStart === 0)) flush(pa.length - 1);
   return out;
 }
 

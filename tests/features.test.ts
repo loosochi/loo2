@@ -132,7 +132,7 @@ describe('heavy and emergency vehicles', () => {
     expect(specOf('bus').points).toBeGreaterThan(specOf('sedan').points);
   });
 
-  it('emergency vehicles spawn on schedule and waiting costs points', () => {
+  it('emergency vehicles spawn on schedule, get priority at red lights, and waiting costs points', () => {
     const base = yieldLevel();
     const specials: SpecialDef[] = [{ at: 1, spawnId: 'W', routeId: 'ws', kind: 'ambulance' }];
     const I = base.intersections[0];
@@ -147,15 +147,19 @@ describe('heavy and emergency vehicles', () => {
     });
     const spawned: string[] = [];
     sim.on({ spawn: (v) => spawned.push(v.kind) });
-    runFor(sim, 12);
+    runFor(sim, 3);
     expect(spawned).toEqual(['ambulance']);
     expect(sim.vehicles[0].emergency).toBe(true);
-    expect(sim.score.emergencyWaitSeconds).toBeGreaterThan(3);
-    expect(sim.score.liveScore).toBe(0);
-    sim.toggleLight('LW');
-    runFor(sim, 20);
+    // Priority: with the junction clear it slows down and crosses on red by itself.
+    runFor(sim, 25);
+    expect(sim.lights.get('LW')!.state).toBe(LightState.RED);
     expect(sim.outcome).toBe('win');
     expect(sim.totalCars).toBe(1);
+    // Standing still costs points.
+    const s2 = new ScoreSystem();
+    s2.onVehicleExit(0, 300);
+    s2.addEmergencyWait(5);
+    expect(s2.liveScore).toBe(300 - 5 * SCORE.emergencyWaitPenaltyPerSecond);
     expect(SCORE.emergencyWaitPenaltyPerSecond).toBeGreaterThan(SCORE.longWaitPenaltyPerSecond);
   });
 });
